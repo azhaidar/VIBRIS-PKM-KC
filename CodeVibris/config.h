@@ -44,7 +44,7 @@
 //330 burden, 10uF kapasitor, 10k 2x resisrot
 #define TICK_DELAY_ARUS      100     // Jeda eksekusi antar perhitungan RMS (ms)
 #define ARUS_ADC_OFFSET      2048    // Titik tengah ADC 12-bit (VCC / 2)
-#define ARUS_SAMPLE_COUNT    500     // Jumlah sampel untuk kalkulasi Root Mean Square
+#define ARUS_SAMPLE_COUNT    600     // Jumlah sampel untuk kalkulasi Root Mean Square
 #define ARUS_CAL_FACTOR      0.004397   // Koefisien pengali kalibrasi nilai ADC ke Ampere
 #define ARUS_NOISE_GATE      0.05f
 // Digital Signal Processing Configuration

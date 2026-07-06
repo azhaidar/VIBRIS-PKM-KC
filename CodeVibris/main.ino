@@ -10,6 +10,7 @@
 #include "InitialBaselineCalibrator.h"
 #include "AdaptiveBaselineLearner.h"
 #include "DiagnosisClassifier.h"
+#include "RaspberryPiDataTransmitter.h"
 
 #define PLOTTER_MODE 0
 bool systemCalibrated = false;
@@ -18,6 +19,7 @@ float bandBaselineMean[4];
 float bandBaselineStd[4];
 
 void setup() {
+    Transmitter_Init(115200);
     Serial.begin(115200);
     delay(2000);
     Serial.println(F("[SYSTEM] Booting Clean Modular Sensor Core..."));
