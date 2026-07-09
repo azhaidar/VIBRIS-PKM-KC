@@ -8,7 +8,7 @@
 # spesifik satu halaman (misal detail grafik, CSV) — itu tanggung jawab
 # file view masing-masing.
 
-import sys, json
+import sys, json, time
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame
 from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
@@ -85,6 +85,7 @@ class Dashboard(QWidget):
 
         self.ser = None
         self._init_serial()
+        self._sync_machine_to_views()
         self.set_mode(0)
 
     # ---------------- HEADER ----------------
@@ -100,6 +101,12 @@ class Dashboard(QWidget):
         self.machine_btn.clicked.connect(self.open_machine_manager)
         h.addWidget(self.machine_btn)
         h.addStretch()
+
+        self.reset_btn = QPushButton("RESET")
+        self.reset_btn.setToolTip("Reset ESP32 (hard reset via pin EN)")
+        self.reset_btn.setStyleSheet(f"background-color:{config.COL_ACCENT}; color:white; font-size:8px; padding:2px 6px;")
+        self.reset_btn.clicked.connect(self.reset_esp32)
+        h.addWidget(self.reset_btn)
 
         self.debug_btn = QPushButton("DEBUG")
         self.debug_btn.setStyleSheet(f"background-color:{config.COL_PANEL_DARK}; color:white; font-size:8px; padding:2px 6px;")
@@ -129,7 +136,7 @@ class Dashboard(QWidget):
 
     def _build_bottom_nav(self):
         frame = QFrame()
-        frame.setFixedHeight(30)
+        frame.setFixedHeight(36)
         frame.setStyleSheet(styles.bottom_nav_style())
         nav = QHBoxLayout(frame)
         nav.setContentsMargins(3, 3, 3, 3)
@@ -163,12 +170,56 @@ class Dashboard(QWidget):
     def set_active_machine(self, machine):
         self.current_machine = machine
         self.machine_btn.setText(machine["label"])
+        self._sync_machine_to_views()
         self.close_machine_manager()
+
+    def _sync_machine_to_views(self):
+        # Satu-satunya tempat yang mendorong label mesin aktif ke view lain.
+        # Tanpa ini, ViewRecording tetap memakai label default selamanya
+        # walau mesin aktif sudah diganti dari Machine Manager.
+        self.view_recording.set_machine_label(self.current_machine["label"])
 
     # ------------- DEBUG -------------
     def toggle_debug(self):
         self.debug_on = not self.debug_on
         self.debug_panel.setVisible(self.debug_on)
+
+    # ------------- RESET ESP32 -------------
+    def reset_esp32(self):
+        # Hard reset lewat pin EN (dipetakan ke RTS pada sirkuit
+        # auto-reset standar board ESP32 DevKit). DTR/GPIO0 sengaja
+        # TIDAK disentuh supaya chip reboot normal, bukan masuk mode
+        # download/bootloader (itu perlu DTR+RTS ditoggle bersamaan
+        # dengan urutan tertentu, seperti yang dipakai esptool).
+        #
+        # CATATAN: polaritas EN<->RTS bisa beda tergantung chip
+        # USB-serial di board (CP2102 vs CH343/CH9102). Kalau setelah
+        # reset device malah diam total (tidak lagi kirim data JSON
+        # sampai kabel USB dicabut-colok manual), berarti board ini
+        # butuh DTR yang ditoggle, bukan RTS — tukar saja dua baris
+        # setRTS di bawah jadi setDTR.
+        if self.view_recording.recording:
+            reply = QMessageBox.question(
+                self, "Konfirmasi Reset ESP32",
+                "Rekaman sedang berjalan. Reset akan menghentikan aliran data "
+                "secara tiba-tiba di tengah sesi.\n\nLanjutkan reset?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        if self.ser is None or not self.ser.is_open:
+            self._log_debug("Reset gagal: port serial belum terbuka.")
+            return
+
+        try:
+            self.ser.setRTS(True)
+            time.sleep(0.1)
+            self.ser.setRTS(False)
+            self._log_debug("ESP32 direset via pin EN (RTS toggle).")
+            self._set_conn(False)
+        except Exception as e:
+            self._log_debug(f"Reset gagal: {e}")
 
     # ------------- SERIAL -------------
     def _init_serial(self):

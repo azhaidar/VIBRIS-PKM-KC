@@ -19,12 +19,12 @@ GRAPH_PENS = ['#d64545', '#c9a227', '#2a6f97', '#e08e00']
 
 # 6 kartu: label tampil, key data, warna aksen saat aktif
 CARD_DEFS = [
-    ("VIBRASI", "rms_v", "#d64545"),
-    ("SUARA",   "rms_a", "#c9a227"),
-    ("ARUS",    "cur",   "#2a6f97"),
-    ("SUHU",    "temp",  "#e08e00"),
-    ("RPM",     "rpm",   "#6a4fd6"),
-    ("D²",      "d2",    "#2e7d32"),
+    ("VIBRASI", "rms_v", "#d64545", "m/s²"),
+    ("SUARA",   "rms_a", "#c9a227", "dB"),
+    ("ARUS",    "cur",   "#2a6f97", "A"),
+    ("SUHU",    "temp",  "#e08e00", "°C"),
+    ("RPM",     "rpm",   "#6a4fd6", "RPM"),
+    ("D²",      "d2",    "#2e7d32", ""),
 ]
 
 STALE_LIMIT = 6  # jumlah siklus nilai diam sebelum dianggap tidak aktif
@@ -47,27 +47,44 @@ def format_compact(value):
         return f"{v/1e3:.2f}K"
     return f"{v:.3f}"
 
-
 class StatCard(QWidget):
-    def __init__(self, label, accent_color):
+    def __init__(self, label, accent_color, unit):
         super().__init__()
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.accent_color = accent_color
-        self.setFixedHeight(64)
+        self.setFixedHeight(40)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(2)
-        layout.setAlignment(Qt.AlignCenter)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
         self.name_label = QLabel(label)
-        self.name_label.setAlignment(Qt.AlignCenter)
-        self.name_label.setStyleSheet(f"color:{config.COL_TEXT_LIGHT}; font-size:8px; font-weight:bold; border:none;")
-        layout.addWidget(self.name_label)
+        self.name_label.setFixedHeight(14)
+        self.name_label.setStyleSheet(
+            f"background-color:{accent_color}; color:white; font-size:8px; "
+            f"font-weight:bold; padding-left:5px; border:none;"
+        )
+        outer.addWidget(self.name_label)
+
+        value_row = QHBoxLayout()
+        value_row.setContentsMargins(5, 1, 5, 1)
+        value_row.setSpacing(4)
 
         self.value_label = QLabel("--")
-        self.value_label.setAlignment(Qt.AlignCenter)
-        self.value_label.setStyleSheet(f"color:{config.COL_TEXT_LIGHT}; font-size:12px; font-weight:bold; font-family:Consolas; border:none;")
-        layout.addWidget(self.value_label)
+        self.value_label.setStyleSheet(
+            f"color:{config.COL_TEXT_LIGHT}; font-size:13px; font-weight:bold; "
+            f"font-family:Consolas; border:none;"
+        )
+        value_row.addWidget(self.value_label)
+        value_row.addStretch()
+
+        self.unit_label = QLabel(unit)
+        self.unit_label.setStyleSheet(f"color:{config.COL_TEXT_LIGHT}; font-size:8px; border:none;")
+        value_row.addWidget(self.unit_label)
+
+        value_row_widget = QWidget()
+        value_row_widget.setLayout(value_row)
+        outer.addWidget(value_row_widget)
 
         self._set_active(False)
 
@@ -76,9 +93,11 @@ class StatCard(QWidget):
         self._set_active(active)
 
     def _set_active(self, active):
-        bg = self.accent_color if active else "#8a8a8a"
-        self.setStyleSheet(f"background-color:{bg}; border-radius:5px;")
-
+        border_color = config.COL_OK if active else config.COL_STALE
+        self.setStyleSheet(
+            f"StatCard {{ background-color:{config.COL_PANEL_DARK}; "
+            f"border:2px solid {border_color}; }}"
+        )
 
 class ViewRaw(QWidget):
     def __init__(self):
@@ -107,32 +126,34 @@ class ViewRaw(QWidget):
 
         graph_widget = QWidget()
         graph_widget.setLayout(graph_col)
-        root.addWidget(graph_widget, 3)
+        root.addWidget(graph_widget, 2)
 
-        # ---------------- KANAN: 6 kartu digit ----------------
-        card_grid = QGridLayout()
-        card_grid.setSpacing(4)
+        
+        # ---------------- KANAN: 6 kartu digit, 1 kolom ke bawah ----------------
+        card_col = QVBoxLayout()
+        card_col.setSpacing(3)
         self.cards = {}
         self.last_values = {}
         self.stale_counter = {}
 
-        for idx, (label, key, color) in enumerate(CARD_DEFS):
-            card = StatCard(label, color)
+        for label, key, color, unit in CARD_DEFS:
+            card = StatCard(label, color, unit)
             self.cards[key] = card
             self.last_values[key] = None
             self.stale_counter[key] = 0
-            card_grid.addWidget(card, idx // 2, idx % 2)
+            card_col.addWidget(card)
+
+        card_col.addStretch()
 
         card_widget = QWidget()
-        card_widget.setLayout(card_grid)
-        root.addWidget(card_widget, 2)
-
+        card_widget.setLayout(card_col)
+        root.addWidget(card_widget, 1)
     def update_data(self, latest):
         for i, key in enumerate(GRAPH_KEYS):
             self.buffers[i].append(latest.get(key, 0))
             self.plots[i].setData(list(self.buffers[i]))
 
-        for label, key, color in CARD_DEFS:
+        for label, key, color, unit in CARD_DEFS:
             value = latest.get(key, 0)
             prev = self.last_values[key]
 

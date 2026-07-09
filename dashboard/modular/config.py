@@ -26,6 +26,7 @@ COL_OK = "#2e7d32"
 COL_WARN = "#e08e00"
 COL_BAD = "#bdb3b3"
 COL_ACCENT = "#2a6f97"
+COL_STALE = "#5a6266"   # abu-abu lemah untuk indikator sensor tidak aktif
 
 STATUS_COLOR = {"Normal": COL_OK, "Waspada": COL_WARN, "Bahaya": COL_BAD, "UNKNOWN": COL_TEXT_DARK}
 

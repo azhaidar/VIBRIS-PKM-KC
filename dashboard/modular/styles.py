@@ -16,12 +16,12 @@ def bottom_nav_style():
 
 
 def nav_btn_style(active):
-    if active:
-        return (f"background-color:{cfg.COL_HEADER}; color:{cfg.COL_TEXT_DARK}; "
-                f"font-weight:bold; font-size:9px; border-radius:3px;")
-    return (f"background-color:#2a4c4c; color:{cfg.COL_TEXT_LIGHT}; "
-            f"font-size:9px; border-radius:3px;")
-
+    def nav_btn_style(active):
+        if active:
+            return (f"background-color:{cfg.COL_HEADER}; color:{cfg.COL_TEXT_DARK}; "
+                    f"font-weight:bold; font-size:11px; border-radius:3px;")
+        return (f"background-color:#2a4c4c; color:{cfg.COL_TEXT_LIGHT}; "
+                f"font-weight:bold; font-size:11px; border-radius:3px;")
 
 def panel_style():
     return f"background-color:{cfg.COL_PANEL}; border-radius:4px;"

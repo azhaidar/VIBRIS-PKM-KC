@@ -1,3 +1,12 @@
+# viewrecording.py
+# Halaman "Recording": 3 bagian (head status, content kiri=list file
+# CSV + kanan=grafik raw dengan scrubbing, bottom=kontrol rekam/hapus/
+# tandai/tag). Menangani DUA mode: (1) live recording — nulis ke CSV
+# sambil gambar grafik real-time, (2) playback — baca CSV lama lalu
+# render grafik statis dengan slider scrub. Tombol "Processed" di sini
+# memanggil callback open_processed_cb(filepath) balik ke main.py yang
+# lalu pindah halaman + load file itu ke viewprocessed.
+
 import os
 import csv
 from datetime import datetime
