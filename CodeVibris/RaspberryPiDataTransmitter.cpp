@@ -15,10 +15,15 @@ void Transmitter_SendResult(SensorFeatures features, DetectionResult result) {
     // Pakai Serial (USB), BUKAN Serial1 — karena kabel fisiknya USB-C ke USB-A,
     // bukan GPIO UART1 terpisah. Baris ini akan campur dengan baris debug lain
     // di stream yang sama — itu sudah diantisipasi di parser Python (skip baris non-JSON).
+    float rmsX = 0.0f, rmsZ = 0.0f, rmsY = 0.0f;
+    Scheduler_GetLatestAxisRMS(&rmsX, &rmsY, &rmsZ);
     Serial.printf(
-        "{\"rms_v\":%.4f,\"rms_a\":%.2f,\"cur\":%.4f,\"temp\":%.2f,"
+        "{\"rms_y\":%.4f,\"rms_x\":%.4f,\"rms_z\":%.4f,\"rms_v\":%.4f,\"rms_a\":%.2f,\"cur\":%.4f,\"temp\":%.2f,"
         "\"rpm\":%.2f,\"d2\":%.2f,\"status\":\"%s\"}\n",
         features.rms_getaran,
+        rmsX,
+        rmsY,
+        rmsZ,
         features.rms_suara,
         features.arus,
         features.suhu,

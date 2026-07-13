@@ -10,6 +10,9 @@ enum FeatureIndex { FEAT_VIBRATION = 0, FEAT_AUDIO = 1, FEAT_CURRENT = 2, FEAT_T
 struct VibrationBuffer {
     float samples[FFT_SAMPLES]; // Array float untuk menampung sampel getaran LIS3DH [cite: 2026-05-06]
     uint32_t timestamp;         // Waktu pengambilan sampel (millis/micros)
+    float rms_x_raw;
+    float rms_y_raw;
+    float rms_z_raw;
 };
 
 // ===================================================================

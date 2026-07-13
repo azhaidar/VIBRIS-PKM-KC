@@ -165,7 +165,7 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
     }
 
     solveMatrixInverse4x4(rawCovariance, sigmaInverseOutput);
-    lastCalibrationValid = true
+    lastCalibrationValid = true;
     Serial.printf("[Calibrator] Baseline selesai dari %d sample.\n", calibrationSampleCount);
 }
 
