@@ -23,8 +23,10 @@
 #include "config.h"
 #include <math.h>
 
-static volatile float g_lastRAWADC = 0.0f
-float DriverArus_GetLastRawADC() {return g_lastRawADC; }
+static volatile float g_lastRawADC = 0.0f;
+float DriverArus_GetLastRawADC() {
+    return g_lastRawADC; 
+}
 
 
 // Jumlah sample harus kelipatan bulat SATU SIKLUS AC penuh.

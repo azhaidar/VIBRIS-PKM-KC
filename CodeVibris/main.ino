@@ -9,6 +9,7 @@
 #include "GenericThresholdClassifier.h"
 #include "RaspberryPiDataTransmitter.h"
 #include "DiagnosisClassifier.h"
+#include "MahalanobisDetector.h"
 
 // Catatan perubahan (biar klean lain paham kenapa file ini beda
 // dari versi sebelumnya):
@@ -42,6 +43,7 @@ static unsigned long bootMillis = 0;
 static float bandBaselineMean[4] = {0.20f, 0.20f, 0.20f, 0.20f};
 static float bandBaselineStd[4]  = {0.10f, 0.10f, 0.10f, 0.10f};
 void setup() {
+    setDiagnosisBandBaseline(bandBaselineMean, bandBaselineStd);
     Transmitter_Init(115200);
     Serial.begin(115200);
     delay(2000);
@@ -102,7 +104,6 @@ void loop() {
         Serial.printf("[BAND_ENERGY] E0=%.4f E1=%.4f E2=%.4f E3=%.4f\n",
             bandEnergies[0], bandEnergies[1], bandEnergies[2], bandEnergies[3]);
 #endif
-    }
 #if PLOTTER_MODE
     Serial.printf("Suhu:%.2f Arus:%.4f Getaran:%.4f Suara:%.2f Status:%s\n",
         merged.suhu, merged.arus, merged.rms_getaran, merged.rms_suara, result.status_label);

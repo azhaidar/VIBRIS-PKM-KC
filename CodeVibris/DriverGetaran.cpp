@@ -46,6 +46,7 @@ void TaskDriverGetaran(void *pvParameters) {
         sensors_event_t event;
         uint32_t batchStartUs = micros();
         int overrunCount = 0;
+        double sumSqX = 0.0, sumSqY = 0.0, sumSqZ = 0.0;
 
         for (int i = 0; i < FFT_SAMPLES; i++) {
             bool readOk = lis3dhInstance.getEvent(&event);
@@ -86,8 +87,8 @@ void TaskDriverGetaran(void *pvParameters) {
             }
         }
         localVibBuffer.rms_x_raw = sqrtf((float)(sumSqX/FFT_SAMPLES));
-        localVibBuffer.rms_y_raw = sqrtf((float)(sumSqY/FFT_SAMPLES));;
-        localVibBuffer.rms_z_raw = sqrtf((float)(sumSqZ/FFT_SAMPLES))
+        localVibBuffer.rms_y_raw = sqrtf((float)(sumSqY/FFT_SAMPLES));
+        localVibBuffer.rms_z_raw = sqrtf((float)(sumSqZ/FFT_SAMPLES));
         
         uint32_t batchElapsedUs = micros() - batchStartUs;
         float actualRateHz = (float)FFT_SAMPLES * 1000000.0f / (float)batchElapsedUs;
@@ -99,7 +100,7 @@ void TaskDriverGetaran(void *pvParameters) {
                           "asumsi %uHz -> RPM & band energy BISA MELESET. Turunkan "
                           "VIBRATION_SAMPLE_RATE_HZ di config.h ke nilai yang tercapai, atau "
                           "optimasi I2C (naikkan clock/kurangi overhead driver).\n",
-                          VIBRATION_SAMPLE_RATE_HZ, actualRateHz, overrunCount, FFT_SAMPLES;
+                          VIBRATION_SAMPLE_RATE_HZ, actualRateHz, overrunCount, FFT_SAMPLES);
         }
 
         QueueHandle_t q = Scheduler_GetVibrationQueue();
