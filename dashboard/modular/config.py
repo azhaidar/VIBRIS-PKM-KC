@@ -20,13 +20,15 @@ COL_PANEL = "#0fa3a3"
 COL_PANEL_LIGHT = "#e8f7f7"
 COL_PANEL_DARK = "#1c1e22"
 COL_STATUSBAR = "#111315"
-COL_TEXT_LIGHT = "#f2f2f2"
+COL_TEXT_LIGHT = "#d0d0d0"
 COL_TEXT_DARK = "#1c1c1c"
 COL_OK = "#2e7d32"
 COL_WARN = "#e08e00"
 COL_BAD = "#bdb3b3"
 COL_ACCENT = "#2a6f97"
 COL_STALE = "#5a6266"   # abu-abu lemah untuk indikator sensor tidak aktif
+COL_TEXT_STALE = "#8a9299"   # abu-abu terang, masih kebaca tapi jelas "mati"
+
 
 STATUS_COLOR = {"Normal": COL_OK, "Waspada": COL_WARN, "Bahaya": COL_BAD, "UNKNOWN": COL_TEXT_DARK}
 

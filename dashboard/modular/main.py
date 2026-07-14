@@ -9,7 +9,7 @@
 # file view masing-masing.
 
 import sys, json, time
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame
+from PyQt5.QtWidgets import QMessageBox, QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QFrame
 from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 
@@ -270,9 +270,9 @@ class Dashboard(QWidget):
     def _tick_clock(self):
         self.clock_label.setText(datetime.now().strftime("%H:%M:%S"))
 
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")   # <- baris baru, taruh SEBELUM Dashboard() dibuat
     win = Dashboard()
     win.show()
     sys.exit(app.exec_())

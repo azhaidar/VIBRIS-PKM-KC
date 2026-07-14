@@ -7,7 +7,7 @@
 # diformat singkat (K/M/B/T) supaya kartu tidak pernah rusak layoutnya.
 # Dipanggil oleh main.py lewat update_data(latest_dict).
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QFrame
 from PyQt5.QtCore import Qt
 import pyqtgraph as pg
 from collections import deque
@@ -47,10 +47,9 @@ def format_compact(value):
         return f"{v/1e3:.2f}K"
     return f"{v:.3f}"
 
-class StatCard(QWidget):
+class StatCard(QFrame):
     def __init__(self, label, accent_color, unit):
         super().__init__()
-        self.setAttribute(Qt.WA_StyledBackground, True)
         self.accent_color = accent_color
         self.setFixedHeight(40)
 
@@ -60,10 +59,6 @@ class StatCard(QWidget):
 
         self.name_label = QLabel(label)
         self.name_label.setFixedHeight(14)
-        self.name_label.setStyleSheet(
-            f"background-color:{accent_color}; color:white; font-size:8px; "
-            f"font-weight:bold; padding-left:5px; border:none;"
-        )
         outer.addWidget(self.name_label)
 
         value_row = QHBoxLayout()
@@ -71,20 +66,13 @@ class StatCard(QWidget):
         value_row.setSpacing(4)
 
         self.value_label = QLabel("--")
-        self.value_label.setStyleSheet(
-            f"color:{config.COL_TEXT_LIGHT}; font-size:13px; font-weight:bold; "
-            f"font-family:Consolas; border:none;"
-        )
         value_row.addWidget(self.value_label)
         value_row.addStretch()
 
         self.unit_label = QLabel(unit)
-        self.unit_label.setStyleSheet(f"color:{config.COL_TEXT_LIGHT}; font-size:8px; border:none;")
         value_row.addWidget(self.unit_label)
 
-        value_row_widget = QWidget()
-        value_row_widget.setLayout(value_row)
-        outer.addWidget(value_row_widget)
+        outer.addLayout(value_row)
 
         self._set_active(False)
 
@@ -94,11 +82,23 @@ class StatCard(QWidget):
 
     def _set_active(self, active):
         border_color = config.COL_OK if active else config.COL_STALE
+        text_color = config.COL_TEXT_LIGHT if active else config.COL_TEXT_STALE
+
         self.setStyleSheet(
-            f"StatCard {{ background-color:{config.COL_PANEL_DARK}; "
+            f"QFrame {{ background-color:{config.COL_PANEL_DARK}; "
             f"border:2px solid {border_color}; }}"
         )
-
+        self.name_label.setStyleSheet(
+            f"background-color:{self.accent_color}; color:white; font-size:8px; "
+            f"font-weight:bold; padding-left:5px; border:none;"
+        )
+        self.value_label.setStyleSheet(
+            f"color:{text_color}; font-size:13px; font-weight:bold; "
+            f"font-family:Consolas; border:none; background:transparent;"
+        )
+        self.unit_label.setStyleSheet(
+            f"color:{text_color}; font-size:8px; border:none; background:transparent;"
+        )
 class ViewRaw(QWidget):
     def __init__(self):
         super().__init__()

@@ -4,6 +4,7 @@
 # kombinasi/format style siap pakai. Kalau mau ubah tampilan visual
 # tanpa ubah logic widget, cukup edit fungsi di sini.
 
+# styles.py
 import config as cfg
 
 
@@ -16,12 +17,12 @@ def bottom_nav_style():
 
 
 def nav_btn_style(active):
-    def nav_btn_style(active):
-        if active:
-            return (f"background-color:{cfg.COL_HEADER}; color:{cfg.COL_TEXT_DARK}; "
-                    f"font-weight:bold; font-size:11px; border-radius:3px;")
-        return (f"background-color:#2a4c4c; color:{cfg.COL_TEXT_LIGHT}; "
-                f"font-weight:bold; font-size:11px; border-radius:3px;")
+    if active:
+        return (f"background-color:{cfg.COL_HEADER}; color:{cfg.COL_TEXT_DARK}; "
+                f"font-weight:bold; font-size:11px; border-radius:3px; border:none;")
+    return (f"background-color:#2a4c4c; color:{cfg.COL_TEXT_LIGHT}; "
+            f"font-weight:bold; font-size:11px; border-radius:3px; border:none;")
+
 
 def panel_style():
     return f"background-color:{cfg.COL_PANEL}; border-radius:4px;"
