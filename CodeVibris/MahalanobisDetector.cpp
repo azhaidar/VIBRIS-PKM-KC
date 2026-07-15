@@ -4,6 +4,7 @@
 #include "CovarianceMatrixSolver.h"
 #include "DualCoreTaskScheduler.h"
 #include "DiagnosisClassifier.h"
+#include "InitialBaselineCalibrator.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -80,8 +81,22 @@ DetectionResult runDetectionCycle() {
     float baselineMean[4];
     float sigmaInverse[4][4];
     getCurrentBaseline(baselineMean, sigmaInverse);
+    float baselineMean[4];
+    float sigmaInverse[4][4];
+    getCurrentBaseline(baselineMean, sigmaInverse);
 
+    float featureStdDev[4];
+    getFeatureStdDev(featureStdDev);
+
+    float currentFeaturesStd[4];
+    float zeroMean[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    for (int i = 0; i < 4; i++) {
+        currentFeaturesStd[i] = (currentFeatures[i] - baselineMean[i]) / featureStdDev[i];
+    }
+
+    float d2 = computeMahalanobisQuadraticForm(currentFeaturesStd, zeroMean, sigmaInverse);
     float d2 = computeMahalanobisQuadraticForm(currentFeatures, baselineMean, sigmaInverse);
+
     const unsigned long GRACE_PERIOD_MS = 120000;
     float thresholdMultiplier = 1.0f;
     if (millis() - baselineReadyTimestamp < GRACE_PERIOD_MS) {

@@ -1,8 +1,13 @@
 //"InitialBaselineCalibrator.cpp
 #include "InitialBaselineCalibrator.h"
 #include "CovarianceMatrixSolver.h"
+#include "InitialBaselineCalibrator.h"
+#include "CovarianceMatrixSolver.h"
 #include <Preferences.h>
 #include <Arduino.h>
+#include <Preferences.h>
+#include <Arduino.h>
+
 
 // FIX: kalibrasi sekarang digerbang WAKTU (180 detik nyata via millis() di
 // main.ino), bukan jumlah sample -- karena rate loop() terbukti TIDAK
@@ -18,6 +23,7 @@ bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]);
 static float calibrationBuffer[CALIBRATION_MAX_SAMPLES][4];
 static int   calibrationSampleCount = 0;
 static bool  calibrationActive = false;
+static float featureStdDev[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
 static Preferences flashStorage;
 static const char* NVS_NAMESPACE = "baseline";
@@ -130,16 +136,38 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
         meanOutput[f] = (float)(sum / calibrationSampleCount);
     }
 
+    for (int f = 0; f < 4; f++) {
+        double sumSqDiff = 0.0;
+        for (int i = 0; i < calibrationSampleCount; i++) {
+            double d = calibrationBuffer[i][f] - meanOutput[f];
+            sumSqDiff += d * d;
+        }
+        featureStdDev[f] = (float)sqrt(sumSqDiff / (calibrationSampleCount - 1));
+        if (featureStdDev[f] < 1e-4f) featureStdDev[f] = 1e-4f;
+    }
+
+    static double standardizedBuffer[CALIBRATION_MAX_SAMPLES][4];
+    for (int i = 0; i < calibrationSampleCount; i++)
+        for (int f = 0; f < 4; f++)
+            standardizedBuffer[i][f] = (calibrationBuffer[i][f] - meanOutput[f]) / featureStdDev[f];
+
     float rawCovariance[4][4];
     for (int a = 0; a < 4; a++) {
         for (int b = 0; b < 4; b++) {
             double sum = 0.0;
             for (int i = 0; i < calibrationSampleCount; i++) {
-                sum += (double)(calibrationBuffer[i][a] - meanOutput[a]) *
-                       (double)(calibrationBuffer[i][b] - meanOutput[b]);
+                sum += standardizedBuffer[i][a] * standardizedBuffer[i][b];
             }
             rawCovariance[a][b] = (float)(sum / (calibrationSampleCount - 1));
         }
+    const float VARIANCE_FLOOR_RATIO = 0.15f;
+    for (int f = 0; f < 4; f++) {
+        float minFloor = fabsf(meanOutput[f]) * VARIANCE_FLOOR_RATIO;
+        minFloor = minFloor * minFloor;
+        if (rawCovariance[f][f] < minFloor) {
+            rawCovariance[f][f] = minFloor;
+        }
+    }
     }
     const float VARIANCE_FLOOR_RATIO = 0.15f;  // minimal 15% dari nilai mean, sbg margin aman
     for (int f = 0; f < 4; f++) {

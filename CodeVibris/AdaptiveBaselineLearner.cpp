@@ -73,6 +73,7 @@ void updateBaselineIfNormal(float currentFeatures[4], bool isCurrentStatusNormal
     // operasi Gauss-Jordan 4x4 tergolong berat untuk dipanggil di setiap
     // siklus deteksi real-time.
     if (updatesSinceLastInverse >= INVERSE_RECOMPUTE_INTERVAL) {
+        applyShrinkageRegularization(currentRawSigma);
         solveMatrixInverse4x4(currentRawSigma, currentSigmaInverse);
         updatesSinceLastInverse = 0;
     }
