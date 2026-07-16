@@ -20,6 +20,7 @@ bool addBandEnergyCalibrationSample(float bandEnergies[4]);
 void computeBandEnergyBaseline(float meanOutput[4], float stdOutput[4]);
 void saveBandBaselineToFlash(float mean[4], float std[4]);
 bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]);
+
 static float calibrationBuffer[CALIBRATION_MAX_SAMPLES][4];
 static int   calibrationSampleCount = 0;
 static bool  calibrationActive = false;
@@ -28,9 +29,11 @@ static float featureStdDev[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 static Preferences flashStorage;
 static const char* NVS_NAMESPACE = "baseline";
 static bool lastCalibrationValid = false;
+
 bool isLastCalibrationValid() {
     return lastCalibrationValid;
 }
+
 void startCalibrationPhase() {
     lastCalibrationValid = false;
     calibrationSampleCount = 0;
@@ -94,6 +97,7 @@ bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]) {
     flashStorage.end();
     return true;
 }
+
 bool addCalibrationSample(SensorFeatures sample) {
     if (!calibrationActive) return false;
 
@@ -130,12 +134,17 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
         return;
     }
 
+    // ===== 1. HITUNG MEAN (tidak berubah dari versi asli) =====
     for (int f = 0; f < 4; f++) {
         double sum = 0.0;
         for (int i = 0; i < calibrationSampleCount; i++) sum += calibrationBuffer[i][f];
         meanOutput[f] = (float)(sum / calibrationSampleCount);
     }
 
+    // ===== 2. HITUNG STD PER FITUR, LALU STANDARDISASI SETIAP SAMPLE =====
+    // Ini akar perbaikan: tanpa langkah ini, fitur dengan skala besar (suhu,
+    // suara) akan mendominasi matriks kovarians dibanding fitur skala kecil
+    // (arus), membuat matriks ill-conditioned secara struktural.
     for (int f = 0; f < 4; f++) {
         double sumSqDiff = 0.0;
         for (int i = 0; i < calibrationSampleCount; i++) {
@@ -143,7 +152,7 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
             sumSqDiff += d * d;
         }
         featureStdDev[f] = (float)sqrt(sumSqDiff / (calibrationSampleCount - 1));
-        if (featureStdDev[f] < 1e-4f) featureStdDev[f] = 1e-4f;
+        if (featureStdDev[f] < 1e-4f) featureStdDev[f] = 1e-4f; // proteksi div-by-zero murni numerik
     }
 
     static double standardizedBuffer[CALIBRATION_MAX_SAMPLES][4];
@@ -151,6 +160,9 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
         for (int f = 0; f < 4; f++)
             standardizedBuffer[i][f] = (calibrationBuffer[i][f] - meanOutput[f]) / featureStdDev[f];
 
+    // ===== 3. HITUNG KOVARIANS DARI DATA YANG SUDAH DISTANDARDISASI =====
+    // Sudah mean-centered oleh standardisasi di atas, jadi tidak perlu
+    // dikurangi mean lagi di sini.
     float rawCovariance[4][4];
     for (int a = 0; a < 4; a++) {
         for (int b = 0; b < 4; b++) {
@@ -160,24 +172,14 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
             }
             rawCovariance[a][b] = (float)(sum / (calibrationSampleCount - 1));
         }
-    const float VARIANCE_FLOOR_RATIO = 0.15f;
-    for (int f = 0; f < 4; f++) {
-        float minFloor = fabsf(meanOutput[f]) * VARIANCE_FLOOR_RATIO;
-        minFloor = minFloor * minFloor;
-        if (rawCovariance[f][f] < minFloor) {
-            rawCovariance[f][f] = minFloor;
-        }
-    }
-    }
-    const float VARIANCE_FLOOR_RATIO = 0.15f;  // minimal 15% dari nilai mean, sbg margin aman
-    for (int f = 0; f < 4; f++) {
-        float minFloor = fabsf(meanOutput[f]) * VARIANCE_FLOOR_RATIO;
-        minFloor = minFloor * minFloor;  // floor dalam satuan variance (kuadrat)
-        if (rawCovariance[f][f] < minFloor) {
-            rawCovariance[f][f] = minFloor;
-        }
-    }
-    // GUARD BARU: tolak baseline kalau ada fitur dengan variance mendekati nol.
+    } // <-- loop 'a' ditutup TEPAT DI SINI, tidak ada blok lain nyangkut di dalamnya
+
+    // CATATAN: blok VARIANCE_FLOOR_RATIO versi lama SENGAJA DIHAPUS di sini.
+    // Setelah standardisasi di langkah 2, variansi tiap fitur otomatis ≈1,
+    // jadi "floor" berbasis skala mean lama sudah tidak relevan lagi dan
+    // berpotensi mendistorsi hasil yang sudah benar secara statistik.
+
+    // GUARD: tolak baseline kalau ada fitur dengan variance mendekati nol.
     // Ini kondisi fisik "device tidak melihat aktivitas nyata" (motor mati/diam),
     // bukan cuma masalah numerik — kalibrasi HARUS diulang dengan mesin aktif.
     const char* featureNames[4] = {"Getaran", "Suara", "Arus", "Suhu"};
@@ -195,6 +197,21 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
 
     if (!calibrationValid) {
         // Jangan hasilkan baseline sama sekali — biarkan caller tahu harus ulang.
+        for (int i = 0; i < 4; i++) meanOutput[i] = 0.0f;
+        for (int i = 0; i < 4; i++)
+            for (int j = 0; j < 4; j++)
+                sigmaInverseOutput[i][j] = (i == j) ? 1.0f : 0.0f;
+        return;
+    }
+
+    // ===== 4. SHRINKAGE + CEK KONDISI MATRIKS, BARU DI-INVERS =====
+    // Urutan wajib: shrinkage dulu (memperbaiki matriks), baru dicek apakah
+    // hasilnya sudah sehat, baru diinvers. Kalau dibalik, pengecekan jadi
+    // useless karena mengevaluasi matriks yang belum diperbaiki.
+    applyShrinkageRegularization(rawCovariance);
+
+    if (!checkMatrixWellConditioned(rawCovariance)) {
+        Serial.println(F("[Calibrator] ERROR: matriks kovarians ill-conditioned setelah shrinkage. Kalibrasi DITOLAK."));
         for (int i = 0; i < 4; i++) meanOutput[i] = 0.0f;
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
@@ -235,4 +252,11 @@ bool loadBaselineFromFlash(float meanOutput[4], float sigmaInverseOutput[4][4]) 
 
     Serial.println(F("[Calibrator] Baseline berhasil dimuat dari flash."));
     return true;
+}
+
+// BARU: getter supaya file lain (MahalanobisDetector.cpp) bisa mengambil
+// featureStdDev yang sama persis dipakai saat kalibrasi, untuk menstandardisasi
+// fitur real-time dengan skala yang konsisten dengan baseline.
+void getFeatureStdDev(float stdDevOutput[4]) {
+    for (int i = 0; i < 4; i++) stdDevOutput[i] = featureStdDev[i];
 }
