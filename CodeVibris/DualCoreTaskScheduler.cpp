@@ -8,6 +8,9 @@
 
 static QueueHandle_t vibrationQueue = NULL;
 static volatile float latestRPM = 0.0f;
+
+static float lastValidRPM = 0.0f;
+#define RPM_MAX_DELTA_PER_CYCLE 300.0f
 static float latestBandEnergies[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
 QueueHandle_t Scheduler_GetVibrationQueue() {
@@ -28,6 +31,11 @@ static void TaskFFTProcessor(void *pvParameters) {
     for (;;) {
         if (xQueueReceive(vibrationQueue, &incomingBuffer, portMAX_DELAY) == pdTRUE) {
             FFTProcessor_Process(&incomingBuffer, &fftLocalFeatures, &rpmResult, bandEnergies);
+            if (rpmResult > 0.0f && lastValidRPM > 0.0f &&
+                fabsf(rpmResult - lastValidRPM) > RPM_MAX_DELTA_PER_CYCLE) {
+                rpmResult = lastValidRPM + (rpmResult > lastValidRPM ? RPM_MAX_DELTA_PER_CYCLE : -RPM_MAX_DELTA_PER_CYCLE);
+            }
+            if (rpmResult > 0.0f) lastValidRPM = rpmResult;
             latestRPM = rpmResult;
             latestRmsX = incomingBuffer.rms_x_raw;   // 
             latestRmsZ = incomingBuffer.rms_z_raw;

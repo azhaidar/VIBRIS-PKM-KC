@@ -8,7 +8,7 @@
 // bukan representasi RPM asli.
 #define FR_MIN_HZ 5.0
 #define FR_MAX_HZ 50.0
-#define RPM_SNR_MIN_RATIO 3.0f 
+#define RPM_SNR_MIN_RATIO 7.0f 
 bool RPM_IsSignalReliable(double *magnitude, int n, float sampleRate, float *snrOut) {
     float freqResolution = sampleRate / n;
     int binMin = (int)(FR_MIN_HZ / freqResolution);
@@ -67,10 +67,21 @@ float RPM_Estimate(double *magnitude, int n, float sampleRate) {
     }
 
     // Konversi index bin balik ke frekuensi (Hz), lalu ke RPM (x60)
-    float fr_hz = maxBinIndex * freqResolution;
-    float rpm = fr_hz * 60.0;
-
-    return rpm;
+    float refinedBin = (float)maxBinIndex;
+    if (maxBinIndex > 0 && maxBinIndex < n / 2 - 1) {
+        float yLeft   = magnitude[maxBinIndex - 1];
+        float yCenter = magnitude[maxBinIndex];
+        float yRight  = magnitude[maxBinIndex + 1];
+        float denom = (yLeft - 2.0f * yCenter + yRight);
+        if (fabsf(denom) > 1e-9f) {
+            float p = 0.5f * (yLeft - yRight) / denom;
+            if (p > -1.0f && p < 1.0f) {
+                refinedBin = (float)maxBinIndex + p;
+            }
+        }
+    }
+    float fr_hz = refinedBin * freqResolution;
+    return fr_hz * 60.0;
 }
 float RPM_ComputeBPFO(float fr_hz, int n_balls, float d_ball, float D_pitch, float phi_deg) {
     float phi_rad = phi_deg * (PI / 180.0f);

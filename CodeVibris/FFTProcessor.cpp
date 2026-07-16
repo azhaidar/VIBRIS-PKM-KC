@@ -67,7 +67,7 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
 
     float snr = 0.0f;
     bool reliable = RPM_IsSignalReliable(vReal, FFT_SAMPLES, SAMPLE_RATE, &snr);
-
+    Serial.printf("[SNR_CHECK] snr=%.2f\n", snr);
     if (!reliable) {
         // Tidak ada mesin berputar terdeteksi — jangan hasilkan RPM/band energy palsu.
         *rpm_out = 0.0f;

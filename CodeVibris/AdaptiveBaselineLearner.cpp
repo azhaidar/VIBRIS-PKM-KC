@@ -21,15 +21,16 @@ static bool  learnerInitialized = false;
 bool isBaselineLearnerReady() {
     return learnerInitialized;
 }
-void initializeBaselineLearner(float initialMean[4], float initialSigma[4][4]) {
+void initializeBaselineLearner(float initialMean[4], float initialSigmaInverse[4][4]) {
     for (int i = 0; i < 4; i++) currentMean[i] = initialMean[i];
+
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++)
-            currentRawSigma[i][j] = initialSigma[i][j];
+            currentRawSigma[i][j] = initialSigmaInverse[i][j];
 
     // Invers pertama dihitung langsung di sini, supaya getCurrentBaseline()
     // bisa langsung dipanggil tanpa perlu nunggu update pertama masuk dulu.
-    solveMatrixInverse4x4(currentRawSigma, currentSigmaInverse);
+    solveMatrixInverse4x4(initialSigmaInverse, currentRawSigma);
 
     updatesSinceLastInverse = 0;
     learnerInitialized = true;

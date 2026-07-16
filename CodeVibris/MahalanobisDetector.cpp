@@ -81,9 +81,6 @@ DetectionResult runDetectionCycle() {
     float baselineMean[4];
     float sigmaInverse[4][4];
     getCurrentBaseline(baselineMean, sigmaInverse);
-    float baselineMean[4];
-    float sigmaInverse[4][4];
-    getCurrentBaseline(baselineMean, sigmaInverse);
 
     float featureStdDev[4];
     getFeatureStdDev(featureStdDev);
@@ -95,8 +92,6 @@ DetectionResult runDetectionCycle() {
     }
 
     float d2 = computeMahalanobisQuadraticForm(currentFeaturesStd, zeroMean, sigmaInverse);
-    float d2 = computeMahalanobisQuadraticForm(currentFeatures, baselineMean, sigmaInverse);
-
     const unsigned long GRACE_PERIOD_MS = 120000;
     float thresholdMultiplier = 1.0f;
     if (millis() - baselineReadyTimestamp < GRACE_PERIOD_MS) {
@@ -106,7 +101,7 @@ DetectionResult runDetectionCycle() {
     
     bool isNormal = (strcmp(label, "Normal") == 0);
 
-    updateBaselineIfNormal(currentFeatures, isNormal);
+    updateBaselineIfNormal(currentFeaturesStd, isNormal);
 
     result.rpm_estimated = Scheduler_GetLatestRPM();
     result.mahalanobis_D2 = d2;

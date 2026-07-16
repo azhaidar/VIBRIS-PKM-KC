@@ -43,6 +43,6 @@ sample, sementara mu dan Sigma mentah tetap diperbarui setiap
 siklus.
 */
 bool isBaselineLearnerReady();
-void initializeBaselineLearner(float initialMean[4], float initialSigma[4][4]);
+void initializeBaselineLearner(float initialMean[4], float initialSigmaInverse[4][4]);
 void updateBaselineIfNormal(float currentFeatures[4], bool isCurrentStatusNormal);
 void getCurrentBaseline(float meanOutput[4], float sigmaInverseOutput[4][4]);
