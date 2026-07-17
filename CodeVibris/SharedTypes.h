@@ -14,6 +14,10 @@ struct VibrationBuffer {
     float rms_y_raw;
     float rms_z_raw;
 };
+struct AudioBuffer {
+    float samples[AUDIO_FFT_SAMPLES];
+    uint32_t timestamp;
+};
 
 // ===================================================================
 // 2. WADAH FITUR SENSOR (FEATURE EXTRACTION - INTER-CORE DATA PASSING)

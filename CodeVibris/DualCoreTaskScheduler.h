@@ -34,5 +34,6 @@ bersamaan tanpa sinkronisasi.
 void Scheduler_InitTasks();
 QueueHandle_t Scheduler_GetVibrationQueue();
 float Scheduler_GetLatestRPM();   // <-- pastikan baris ini ADA di .h, bukan cuma di .cpp
+float Scheduler_GetLatestSNR();
 void Scheduler_GetLatestBandEnergies(float *dest);   // TAMBAHAN
 void Scheduler_GetLatestAxisRMS(float *xOut, float *yOut, float *zOut);

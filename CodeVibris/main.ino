@@ -12,6 +12,8 @@
 #include "MahalanobisDetector.h"
 #include "InitialBaselineCalibrator.h"   
 #include "AdaptiveBaselineLearner.h" 
+#include "RPMEstimator.h"
+#include "FFTProcessor.h"
 
 // Catatan perubahan (biar klean lain paham kenapa file ini beda
 // dari versi sebelumnya):
@@ -102,7 +104,7 @@ void loop() {
         // sample yang berhasil ditangkap dalam jendela 180 detik ini dipakai,
         // sebanyak apapun jumlahnya (tergantung rate riil setelah fix DriverArus).
         addCalibrationSample(merged);
-        addSNRCalibrationSample(snr); 
+        addSNRCalibrationSample(Scheduler_GetLatestSNR());
 
         float bandEnergies[4];
         Scheduler_GetLatestBandEnergies(bandEnergies);
@@ -111,11 +113,12 @@ void loop() {
         strncpy(result.status_label, "Calibrating", sizeof(result.status_label) - 1);
         result.status_label[sizeof(result.status_label) - 1] = '\0';
     } else if (!isBaselineLearnerReady()) {
-        float mean[4], sigmaInv[4][4];
+        float mean[4], stdDev[4], sigmaInv[4][4];
         computeInitialBaseline(mean, sigmaInv);
 
         if (isLastCalibrationValid()) {
-            initializeBaselineLearner(mean, sigmaInv);
+            getFeatureStdDev(stdDev);
+            initializeBaselineLearner(mean, stdDev, sigmaInv);
             saveBaselineToFlash(mean, sigmaInv);
 
             // TAMBAHAN: baseline band frekuensi sekarang dihitung dari data

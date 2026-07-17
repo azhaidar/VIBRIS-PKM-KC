@@ -8,6 +8,7 @@
 
 static QueueHandle_t vibrationQueue = NULL;
 static volatile float latestRPM = 0.0f;
+static volatile float latestSNR = 0.0f;
 
 static float lastValidRPM = 0.0f;
 #define RPM_MAX_DELTA_PER_CYCLE 300.0f
@@ -23,6 +24,7 @@ static float latestRmsY = 0.0f;
 static void TaskFFTProcessor(void *pvParameters) {
     static VibrationBuffer incomingBuffer;
     float rpmResult = 0.0f;
+    float snrResult = 0.0f;
     float bandEnergies[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     SensorFeatures fftLocalFeatures;
 
@@ -30,13 +32,16 @@ static void TaskFFTProcessor(void *pvParameters) {
 
     for (;;) {
         if (xQueueReceive(vibrationQueue, &incomingBuffer, portMAX_DELAY) == pdTRUE) {
-            FFTProcessor_Process(&incomingBuffer, &fftLocalFeatures, &rpmResult, bandEnergies);
+            float snrResult = 0.0f;
+            FFTProcessor_Process(&incomingBuffer, &fftLocalFeatures, &rpmResult, bandEnergies, &snrResult);
+            latestSNR = snrResult;
             if (rpmResult > 0.0f && lastValidRPM > 0.0f &&
                 fabsf(rpmResult - lastValidRPM) > RPM_MAX_DELTA_PER_CYCLE) {
                 rpmResult = lastValidRPM + (rpmResult > lastValidRPM ? RPM_MAX_DELTA_PER_CYCLE : -RPM_MAX_DELTA_PER_CYCLE);
             }
             if (rpmResult > 0.0f) lastValidRPM = rpmResult;
             latestRPM = rpmResult;
+            latestSNR = snrResult;
             latestRmsX = incomingBuffer.rms_x_raw;   // 
             latestRmsZ = incomingBuffer.rms_z_raw;
             latestRmsY = incomingBuffer.rms_y_raw;   //
@@ -65,6 +70,9 @@ void Scheduler_InitTasks() {
 
 float Scheduler_GetLatestRPM() {
     return latestRPM;
+}
+float Scheduler_GetLatestSNR() {
+    return latestSNR;
 }
 void Scheduler_GetLatestBandEnergies(float *dest) {
     for (int i = 0; i < 4; i++) dest[i] = latestBandEnergies[i];
