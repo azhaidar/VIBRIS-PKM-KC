@@ -11,7 +11,7 @@
 
 static float g_snrCalibBuffer[200];
 static int   g_snrCalibCount = 0;
-static float g_runtimeSNRThreshold = 3.0f;  // fallback awal sebelum kalibrasi selesai
+static float g_runtimeSNRThreshold = 6.0f;  // fallback awal sebelum kalibrasi selesai
 
 void resetSNRCalibration() { g_snrCalibCount = 0; }
 

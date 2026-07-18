@@ -39,7 +39,9 @@ struct DetectionResult {
     char status_label[16];      // String status: "Normal", "Waspada", atau "Bahaya"
     char diagnosis_label[20];   // "UNBALANCE" / "MISALIGNMENT" / "BEARING_BPFO" / "BEARING_BPFI" / "NORMAL" / "N/A"
     float diagnosis_confidence; // Z-score band paling menyimpang
-};
+    char audio_diagnosis_label[20];      // BARU
+    float audio_diagnosis_confidence;
+}
 
 // Tbearign abangku
 struct BearingSpec {

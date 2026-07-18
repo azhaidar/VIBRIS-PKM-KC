@@ -1,5 +1,6 @@
 #include "DualCoreTaskScheduler.h"
 #include "FFTProcessor.h"
+#include "DriverAudioFFTProcessor.h"
 #include "config.h"
 #include "MultiSensorFeatureMerger.h"
 #include <Arduino.h>
@@ -7,16 +8,18 @@
 #include "freertos/queue.h"
 
 static QueueHandle_t vibrationQueue = NULL;
+static QueueHandle_t audioQueue = NULL;
 static volatile float latestRPM = 0.0f;
 static volatile float latestSNR = 0.0f;
 
 static float lastValidRPM = 0.0f;
-#define RPM_MAX_DELTA_PER_CYCLE 300.0f
+//#define RPM_MAX_DELTA_PER_CYCLE 300.0f
 static float latestBandEnergies[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+static float latestAudioBandEnergies[AUDIO_BAND_COUNT] = {0.0f, 0.0f, 0.0f};   // BARU
 
-QueueHandle_t Scheduler_GetVibrationQueue() {
-    return vibrationQueue;
-}
+QueueHandle_t Scheduler_GetVibrationQueue() { return vibrationQueue; }
+QueueHandle_t Scheduler_GetAudioQueue() { return audioQueue; }
+
 static float latestRmsX = 0.0f;
 static float latestRmsZ = 0.0f;
 static float latestRmsY = 0.0f;
@@ -34,10 +37,15 @@ static void TaskFFTProcessor(void *pvParameters) {
         if (xQueueReceive(vibrationQueue, &incomingBuffer, portMAX_DELAY) == pdTRUE) {
             float snrResult = 0.0f;
             FFTProcessor_Process(&incomingBuffer, &fftLocalFeatures, &rpmResult, bandEnergies, &snrResult);
-            latestSNR = snrResult;
-            if (rpmResult > 0.0f && lastValidRPM > 0.0f &&
-                fabsf(rpmResult - lastValidRPM) > RPM_MAX_DELTA_PER_CYCLE) {
-                rpmResult = lastValidRPM + (rpmResult > lastValidRPM ? RPM_MAX_DELTA_PER_CYCLE : -RPM_MAX_DELTA_PER_CYCLE);
+            latestSNR = snrResult;            
+        if (rpmResult > 0.0f && lastValidRPM > 0.0f) {
+            float maxDelta = lastValidRPM * RPM_MAX_DELTA_PERCENT;
+            if (maxDelta < RPM_MAX_DELTA_MIN) maxDelta = RPM_MAX_DELTA_MIN;
+            if (fabsf(rpmResult - lastValidRPM) > maxDelta) {
+                rpmResult = lastValidRPM + (rpmResult > lastValidRPM ? maxDelta : -maxDelta);
+            }
+        }
+  
             }
             if (rpmResult > 0.0f) lastValidRPM = rpmResult;
             latestRPM = rpmResult;
@@ -59,12 +67,32 @@ void Scheduler_GetLatestAxisRMS(float *xOut, float *yOut, float *zOut) {
     *yOut = latestRmsY;
     *zOut = latestRmsZ;
 }
+
+static void TaskAudioFFTProcessor(void *pvParameters) {
+    static AudioBuffer incomingAudio;
+    float bandEnergies[AUDIO_BAND_COUNT];
+
+    DriverAudioFFTProcessor_Init();
+
+    for (;;) {
+        if (xQueueReceive(audioQueue, &incomingAudio, portMAX_DELAY) == pdTRUE) {
+            DriverAudioFFTProcessor_Process(&incomingAudio, bandEnergies);
+            for (int i = 0; i < AUDIO_BAND_COUNT; i++) latestAudioBandEnergies[i] = bandEnergies[i];
+        }
+    }
+}
 void Scheduler_InitTasks() {
     vibrationQueue = xQueueCreate(1, sizeof(VibrationBuffer));
+    audioQueue = xQueueCreate(1, sizeof(AudioBuffer));   // BARU
 
     xTaskCreatePinnedToCore(
         TaskFFTProcessor, "Task_FFT", STACK_TASK_FFT, NULL,
         PRIO_TASK_FFT, NULL, CORE_SYSTEM_SLOW_IO
+    );
+
+    xTaskCreatePinnedToCore(   // BARU
+        TaskAudioFFTProcessor, "Task_AudioFFT", STACK_TASK_AUDIO_FFT, NULL,
+        PRIO_TASK_AUDIO_FFT, NULL, CORE_SYSTEM_SLOW_IO
     );
 }
 
@@ -76,4 +104,7 @@ float Scheduler_GetLatestSNR() {
 }
 void Scheduler_GetLatestBandEnergies(float *dest) {
     for (int i = 0; i < 4; i++) dest[i] = latestBandEnergies[i];
+}
+void Scheduler_GetLatestAudioBandEnergies(float *dest) {  
+    for (int i = 0; i < AUDIO_BAND_COUNT; i++) dest[i] = latestAudioBandEnergies[i];
 }

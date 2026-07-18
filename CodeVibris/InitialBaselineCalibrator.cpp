@@ -183,7 +183,7 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
     // Ini kondisi fisik "device tidak melihat aktivitas nyata" (motor mati/diam),
     // bukan cuma masalah numerik — kalibrasi HARUS diulang dengan mesin aktif.
     const char* featureNames[4] = {"Getaran", "Suara", "Arus", "Suhu"};
-    const float MIN_ACCEPTABLE_VARIANCE = 1e-4f;
+    const float MIN_ACCEPTABLE_VARIANCE = 5e-4f;
     bool calibrationValid = true;
 
     for (int f = 0; f < 4; f++) {

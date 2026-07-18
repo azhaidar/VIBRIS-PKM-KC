@@ -59,3 +59,10 @@
 
 #define AUDIO_FFT_SAMPLES     1024
 #define AUDIO_SAMPLE_RATE_HZ  16000U
+
+#define AUDIO_BAND_COUNT      3   // BARU
+
+#define RPM_MAX_DELTA_PERCENT   0.20f   // BARU
+#define RPM_MAX_DELTA_MIN       50.0f   // BARU
+#define PRIO_TASK_AUDIO_FFT     1       // BARU
+#define STACK_TASK_AUDIO_FFT    4096    // BARU
