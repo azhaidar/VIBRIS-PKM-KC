@@ -18,6 +18,11 @@ static bool hasRollingBearing = true;
 void setBearingType(bool rollingBearing) {
     hasRollingBearing = rollingBearing;
 }
+static float ambientRmsEMA = 0.01f;
+static const float AMBIENT_EMA_ALPHA = 0.08f;
+static const float ABSOLUTE_FLOOR_MULTIPLIER = 3.0f;
+static float stableRPM = 0.0f;
+static int reliableStreak = 0;
 void FFTProcessor_Init() {}
 
 float bandEnergy(double *magnitude, float freqResolution, float f_low, float f_high, int n) {
@@ -49,22 +54,35 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
     features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
 
+    float effectiveSampleRate = (input->actual_rate_hz > 1.0f) ? input->actual_rate_hz : SAMPLE_RATE;
     float snr = 0.0f;
-    bool reliable = RPM_IsSignalReliable(vReal, FFT_SAMPLES, SAMPLE_RATE, &snr);
+    bool snrReliable = RPM_IsSignalReliable(vReal, FFT_SAMPLES, effectiveSampleRate, &snr);
     if (snr_out) *snr_out = snr;
-    Serial.printf("[SNR_CHECK] snr=%.2f\n", snr);
+
+    float absoluteFloor = ambientRmsEMA * ABSOLUTE_FLOOR_MULTIPLIER;
+    bool vibrationStrongEnough = (features->rms_getaran >= absoluteFloor);
+    bool reliable = snrReliable && vibrationStrongEnough;
 
     if (!reliable) {
+        reliableStreak = 0;
+        stableRPM = 0.0f;
         *rpm_out = 0.0f;
         for (int i = 0; i < 4; i++) bandEnergies_out[i] = 0.0f;
         features->valid = false;
-        Serial.printf("[FFT] SNR=%.2f terlalu rendah, sinyal putaran tidak terdeteksi.\n", snr);
+        if (!snrReliable) {
+            ambientRmsEMA = (1.0f - AMBIENT_EMA_ALPHA) * ambientRmsEMA + AMBIENT_EMA_ALPHA * features->rms_getaran;
+        }
+        Serial.printf("[FFT] Tidak reliable (snr=%.2f, rms=%.4f, floor=%.4f) -> RPM=0\n", snr, features->rms_getaran, absoluteFloor);
         return;
     }
 
-    float fr_rpm = RPM_Estimate(vReal, FFT_SAMPLES, SAMPLE_RATE);
-    *rpm_out = fr_rpm;
+    float fr_rpm = RPM_Estimate(vReal, FFT_SAMPLES, effectiveSampleRate);
+    reliableStreak++;
+    if (reliableStreak >= 2) stableRPM = fr_rpm;
+    *rpm_out = stableRPM;
+
     float fr_hz = fr_rpm / 60.0;
+    float freqRes = effectiveSampleRate / FFT_SAMPLES;
 
     float freqRes = SAMPLE_RATE / FFT_SAMPLES;
     bandEnergies_out[0] = bandEnergy(vReal, freqRes, 0.9f * fr_hz, 1.1f * fr_hz, FFT_SAMPLES);
@@ -75,6 +93,7 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
         float bpfi_hz = RPM_ComputeBPFI(fr_hz, 8, 3.5f, 22.0f, 0.0f);
         bandEnergies_out[2] = bandEnergy(vReal, freqRes, 0.9f * bpfo_hz, 1.1f * bpfo_hz, FFT_SAMPLES);
         bandEnergies_out[3] = bandEnergy(vReal, freqRes, 0.9f * bpfi_hz, 1.1f * bpfi_hz, FFT_SAMPLES);
+        void setBearingType(bool rollingBearing);
     } else {
         bandEnergies_out[2] = 0.0f;
         bandEnergies_out[3] = 0.0f;

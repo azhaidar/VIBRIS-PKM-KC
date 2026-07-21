@@ -93,7 +93,7 @@ void TaskDriverGetaran(void *pvParameters) {
         uint32_t batchElapsedUs = micros() - batchStartUs;
         float actualRateHz = (float)FFT_SAMPLES * 1000000.0f / (float)batchElapsedUs;
         float rateError = fabsf(actualRateHz - (float)VIBRATION_SAMPLE_RATE_HZ) / (float)VIBRATION_SAMPLE_RATE_HZ;
-
+        localVibBuffer.actual_rate_hz = actualRateHz;   // <-- BARU
         if (rateError > SAMPLE_RATE_TOLERANCE || overrunCount > 0) {
             Serial.printf("[WARNING][DriverGetaran] Target %uHz TIDAK tercapai! Aktual=%.1fHz "
                           "(%d/%d sample overrun/telat). FFTProcessor tetap menghitung pakai "

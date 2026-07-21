@@ -13,6 +13,7 @@ struct VibrationBuffer {
     float rms_x_raw;
     float rms_y_raw;
     float rms_z_raw;
+    float actual_rate_hz;
 };
 struct AudioBuffer {
     float samples[AUDIO_FFT_SAMPLES];
@@ -41,7 +42,7 @@ struct DetectionResult {
     float diagnosis_confidence; // Z-score band paling menyimpang
     char audio_diagnosis_label[20];      // BARU
     float audio_diagnosis_confidence;
-}
+};
 
 // Tbearign abangku
 struct BearingSpec {
