@@ -56,15 +56,9 @@ struct BearingSpec {
 // Tabel bearing umum (approksimasi Pd = rata-rata bore+OD, Bd dari referensi
 // umum seri 62xx -- BUKAN data pabrikan presisi. Verifikasi manual pakai
 // jangka sorong kalau butuh akurasi tinggi untuk laporan resmi).
-static const BearingSpec BEARING_TABLE[] = {
-    // n_balls, Bd(mm), Pd(mm), phi(deg), label
-//    {8, 5.5f,  21.0f, 0.0f, "6201 (12x32x10)"},
-    {8, 6.35f, 25.0f, 0.0f, "6202 (15x35x11)"},   // default motor 1/4HP kamu
-//    {8, 6.75f, 28.5f, 0.0f, "6203 (17x40x12)"},
-//    {8, 7.6f,  33.5f, 0.0f, "6204 (20x47x14)"},
-};
-//#define BEARING_TABLE_SIZE (sizeof(BEARING_TABLE)/sizeof(BEARING_TABLE[0]))
-//#define BEARING_DEFAULT_INDEX 1   // 6202 -- sesuai motor 1/4HP 1-fasa yang kamu tes
+// Spek bearing motor uji aktif: 6202 (drive end) & 6202/6201 (non-drive end),
+// umum untuk dinamo 1-fasa 4-pole 1/4HP. Ganti angka ini kalau motor uji diganti.
+static const BearingSpec ACTIVE_BEARING_SPEC = {8, 6.35f, 25.0f, 0.0f, "6202 (15x35x11)"};
 
 // PENTING: bukan 'static' -- ini DIDEKLARASIKAN di sini, tapi
 // DIDEFINISIKAN cuma sekali di FFTProcessor.cpp (lihat FIX 2).

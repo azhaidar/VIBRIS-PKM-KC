@@ -47,7 +47,7 @@ static char groundTruthLabel[16] = "NORMAL";
 
 static float bandBaselineMean[4] = {0.20f, 0.20f, 0.20f, 0.20f};
 static float bandBaselineStd[4]  = {0.10f, 0.10f, 0.10f, 0.10f};
-#define CALIBRATION_DURATION_MS 30000UL   // 180 detik NYATA (millis()), bukan hitungan sample
+#define CALIBRATION_DURATION_MS 30000UL   // 30 detik NYATA (millis()), bukan hitungan sample
 static unsigned long calibrationStartMillis = 0;
 void setup() {
     setDiagnosisBandBaseline(bandBaselineMean, bandBaselineStd);
@@ -104,18 +104,6 @@ void loop() {
             strncpy(groundTruthLabel, "BEARING_FAULT", sizeof(groundTruthLabel) - 1);
             Serial.println(F("[TEST] Ground truth: BEARING_FAULT"));
         }
-
-        } else if (cmd >= '0' && cmd <= '9') {
-            // Pilih spek bearing dari BEARING_TABLE (lihat SharedTypes.h)
-            // Kirim '0'=6201, '1'=6202 (default), '2'=6203, '3'=6204
-            int idx = cmd - '0';
-            if (idx < (int)BEARING_TABLE_SIZE) {
-                currentBearingSpec = BEARING_TABLE[idx];
-                Serial.printf("[CMD] Bearing spec dipilih: %s\n", currentBearingSpec.label);
-            } else {
-                Serial.println(F("[CMD] Index bearing tidak valid."));
-            }
-        }
     }
     if (!fresh && stillWarmingUp) {
         strncpy(result.status_label, "Warming", sizeof(result.status_label) - 1);
@@ -165,7 +153,7 @@ void loop() {
         result = runDetectionCycle();
     }
 
-    Transmitter_SendResult(merged, groundTruthLabel);
+    Transmitter_SendResult(merged, result, groundTruthLabel);
 
 #if DEBUG_BAND_ENERGY_MODE
         // Nyalakan mode ini SEMENTARA saat mesin dalam kondisi NORMAL untuk

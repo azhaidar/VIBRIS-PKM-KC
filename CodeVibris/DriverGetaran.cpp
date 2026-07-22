@@ -48,8 +48,10 @@ void TaskDriverGetaran(void *pvParameters) {
         sensors_event_t event;
         uint32_t batchStartUs = micros();
         int overrunCount = 0;
+ 
         double sumSqX = 0.0, sumSqY = 0.0, sumSqZ = 0.0;
-
+        double sumSqFilteredX = 0.0, sumSqFilteredY = 0.0, sumSqFilteredZ = 0.0;
+        static float fxBuf[FFT_SAMPLES], fyBuf[FFT_SAMPLES], fzBuf[FFT_SAMPLES];
         for (int i = 0; i < FFT_SAMPLES; i++) {
             bool readOk = lis3dhInstance.getEvent(&event);
 
@@ -85,13 +87,29 @@ void TaskDriverGetaran(void *pvParameters) {
             filteredYOld = fy; rawYOld = ay;
             filteredZOld = fz; rawZOld = az;
 
-            float dynamicVibration = sqrtf(fx * fx + fy * fy + fz * fz);
-
-            localVibBuffer.samples[i] = dynamicVibration;
+            // JANGAN gabung 3 axis pakai sqrt(fx²+fy²+fz²) -- itu operasi
+            // penyearah (magnitude selalu positif), yang melipatgandakan
+            // frekuensi sinyal AC (klasik: full-wave rectifier 1 gelombang
+            // f menghasilkan dominan di 2f). Ini yang bikin RPM kebaca
+            // ~2x lipat dari RPM asli motor kamu (2795 RPM terbaca, motor
+            // asli 1400 RPM -- persis rasio 2x).
+            //
+            // Pakai 1 axis dominan LANGSUNG (bipolar, +/-) sebagai input FFT.
+            // Dari data lapangan, axis Y yang paling banyak menangkap getaran
+            // AC radial motor kamu (rms_y hampir sama dengan rms_v gabungan).
+            // Kalau sensor dipasang di orientasi/motor lain nanti, cek ulang
+            // axis mana yang paling dominan (rms_x/y/z di Serial print), lalu
+            // sesuaikan baris di bawah.
+            fxBuf[i] = fx;
+            fyBuf[i] = fy;
+            fzBuf[i] = fz;
 
             sumSqX += (double)(ax*ax);
             sumSqY += (double)(ay*ay);
             sumSqZ += (double)(az*az);
+            sumSqFilteredX += (double)(fx*fx);
+            sumSqFilteredY += (double)(fy*fy);
+            sumSqFilteredZ += (double)(fz*fz);
             nextSampleUs += VIBRATION_SAMPLE_PERIOD_US;
             if ((int32_t)(micros() - nextSampleUs) >= 0) {
                 overrunCount++;
@@ -100,6 +118,19 @@ void TaskDriverGetaran(void *pvParameters) {
                 taskYIELD();
             }
         }
+        // Pilih axis dominan batch ini: yang energi AC (setelah HPF)-nya
+        // paling besar. Ini yang bikin sistem otomatis "ikut" ke mana pun
+        // getaran motor sebenarnya mengarah, gak peduli sensor ditempel
+        // dengan orientasi apapun.
+        float *dominantAxisBuf = fyBuf;
+        double maxEnergy = sumSqFilteredY;
+        if (sumSqFilteredX > maxEnergy) { dominantAxisBuf = fxBuf; maxEnergy = sumSqFilteredX; }
+        if (sumSqFilteredZ > maxEnergy) { dominantAxisBuf = fzBuf; maxEnergy = sumSqFilteredZ; }
+        for (int i = 0; i < FFT_SAMPLES; i++) {
+            localVibBuffer.samples[i] = dominantAxisBuf[i];
+        }
+
+        localVibBuffer.rms_x_raw = sqrtf((float)(sumSqX/FFT_SAMPLES));
         localVibBuffer.rms_x_raw = sqrtf((float)(sumSqX/FFT_SAMPLES));
         localVibBuffer.rms_y_raw = sqrtf((float)(sumSqY/FFT_SAMPLES));
         localVibBuffer.rms_z_raw = sqrtf((float)(sumSqZ/FFT_SAMPLES));
@@ -109,17 +140,18 @@ void TaskDriverGetaran(void *pvParameters) {
         float rateError = fabsf(actualRateHz - (float)VIBRATION_SAMPLE_RATE_HZ) / (float)VIBRATION_SAMPLE_RATE_HZ;
         localVibBuffer.actual_rate_hz = actualRateHz;   // <-- BARU
         if (rateError > SAMPLE_RATE_TOLERANCE || overrunCount > 0) {
-            Serial.printf("[WARNING][DriverGetaran] Target %uHz TIDAK tercapai! Aktual=%.1fHz "
-                          "(%d/%d sample overrun/telat). FFTProcessor tetap menghitung pakai "
-                          "asumsi %uHz -> RPM & band energy BISA MELESET. Turunkan "
-                          "VIBRATION_SAMPLE_RATE_HZ di config.h ke nilai yang tercapai, atau "
-                          "optimasi I2C (naikkan clock/kurangi overhead driver).\n",
-                          VIBRATION_SAMPLE_RATE_HZ, actualRateHz, overrunCount, FFT_SAMPLES);
-        }
+        Serial.printf("[WARNING][DriverGetaran] Target %uHz TIDAK tercapai! Aktual=%.1fHz "
+                    "(%d/%d sample overrun/telat). FFTProcessor tetap menghitung pakai "
+                    "asumsi %uHz -> RPM & band energy BISA MELESET. Turunkan "
+                    "VIBRATION_SAMPLE_RATE_HZ di config.h ke nilai yang tercapai, atau "
+                    "optimasi I2C (naikkan clock/kurangi overhead driver).\n",
+                    VIBRATION_SAMPLE_RATE_HZ, actualRateHz, overrunCount, FFT_SAMPLES,
+                    VIBRATION_SAMPLE_RATE_HZ);
 
         QueueHandle_t q = Scheduler_GetVibrationQueue();
         if (q != NULL) {
             xQueueOverwrite(q, &localVibBuffer);
         }
     }
+}
 }

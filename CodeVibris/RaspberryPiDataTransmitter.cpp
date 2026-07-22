@@ -45,5 +45,4 @@ void Transmitter_SendResult(SensorFeatures features, DetectionResult result, con
         result.audio_diagnosis_label, result.audio_diagnosis_confidence,
         groundTruthLabel
     );
-   );
 }

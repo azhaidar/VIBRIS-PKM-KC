@@ -14,7 +14,7 @@ double vImag[FFT_SAMPLES];
 ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, FFT_SAMPLES, SAMPLE_RATE);
 
 //Definisi Tungaal current beraingspec
-BearingSpec currentBearingSpec = BEARING_TABLE[BEARING_DEFAULT_INDEX];
+BearingSpec currentBearingSpec = ACTIVE_BEARING_SPEC;
 
 static bool hasRollingBearing = true;
 
