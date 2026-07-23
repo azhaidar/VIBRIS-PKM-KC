@@ -13,7 +13,7 @@ double vReal[FFT_SAMPLES];
 double vImag[FFT_SAMPLES];
 ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, FFT_SAMPLES, SAMPLE_RATE);
 
-//Definisi Tungaal current beraingspec
+//Definisi Tunggal current bearing spec
 BearingSpec currentBearingSpec = ACTIVE_BEARING_SPEC;
 
 static bool hasRollingBearing = true;
@@ -21,9 +21,7 @@ static bool hasRollingBearing = true;
 void setBearingType(bool rollingBearing) {
     hasRollingBearing = rollingBearing;
 }
-static float ambientRmsEMA = 0.01f;
-static const float AMBIENT_EMA_ALPHA = 0.08f;
-static const float ABSOLUTE_FLOOR_MULTIPLIER = 3.0f;
+
 static float stableRPM = 0.0f;
 static int reliableStreak = 0;
 void FFTProcessor_Init() {}
@@ -57,14 +55,35 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
     features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
 
-    float effectiveSampleRate = (input->actual_rate_hz > 1.0f) ? input->actual_rate_hz : SAMPLE_RATE;
+    float effectiveSampleRate = (input->actual_rate_hz > 1.0f) ?
+        input->actual_rate_hz : SAMPLE_RATE;
     float snr = 0.0f;
     bool snrReliable = RPM_IsSignalReliable(vReal, FFT_SAMPLES, effectiveSampleRate, &snr);
     if (snr_out) *snr_out = snr;
 
-    float absoluteFloor = ambientRmsEMA * ABSOLUTE_FLOOR_MULTIPLIER;
-    bool vibrationStrongEnough = (features->rms_getaran >= absoluteFloor);
-    bool reliable = snrReliable && vibrationStrongEnough;
+    // FIX: gerbang RMS-floor (ambientRmsEMA) DIHAPUS -- variabel itu niatnya
+    // belajar getaran "saat motor diam", tapi protokol pengujian kita
+    // mengharuskan motor SUDAH jalan sebelum device di-reset, jadi variabel
+    // itu tidak pernah punya data "diam" untuk dipelajari dan malah mengejar
+    // levelnya sendiri sampai tidak pernah bisa terpenuhi. SNR check sudah
+    // cukup kuat sendirian untuk membedakan sinyal putaran asli vs noise.
+    bool reliable = snrReliable;
+
+    // Diagnostik: cari & CETAK puncak spektrum di rentang 5-50Hz SELALU --
+    // tidak digerbang oleh "reliable". Supaya kamu bisa lihat langsung di
+    // Serial Monitor frekuensi apa yang sebenarnya dilihat FFT.
+    float freqResDiag = effectiveSampleRate / FFT_SAMPLES;
+    int binMinDiag = (int)(FR_MIN_HZ / freqResDiag);
+    int binMaxDiag = (int)(FR_MAX_HZ / freqResDiag);
+    float peakAmpDiag = 0.0f;
+    int peakBinDiag = binMinDiag;
+    for (int i = binMinDiag; i <= binMaxDiag && i < FFT_SAMPLES / 2; i++) {
+        if (vReal[i] > peakAmpDiag) { peakAmpDiag = (float)vReal[i]; peakBinDiag = i; }
+    }
+    float peakFreqHzDiag = peakBinDiag * freqResDiag;
+    Serial.printf("[FFT-DIAG] puncak=%.2fHz (~%.0fRPM) amp=%.2f | snr=%.2f snrOK=%d | rms=%.4f\n",
+        peakFreqHzDiag, peakFreqHzDiag * 60.0f, peakAmpDiag,
+        snr, snrReliable, features->rms_getaran);
 
     if (!reliable) {
         reliableStreak = 0;
@@ -72,10 +91,6 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
         *rpm_out = 0.0f;
         for (int i = 0; i < 4; i++) bandEnergies_out[i] = 0.0f;
         features->valid = false;
-        if (!snrReliable) {
-            ambientRmsEMA = (1.0f - AMBIENT_EMA_ALPHA) * ambientRmsEMA + AMBIENT_EMA_ALPHA * features->rms_getaran;
-        }
-        Serial.printf("[FFT] Tidak reliable (snr=%.2f, rms=%.4f, floor=%.4f) -> RPM=0\n", snr, features->rms_getaran, absoluteFloor);
         return;
     }
 
@@ -97,7 +112,6 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
             currentBearingSpec.d_ball_mm, currentBearingSpec.D_pitch_mm, currentBearingSpec.phi_deg);
         bandEnergies_out[2] = bandEnergy(vReal, freqRes, 0.9f * bpfo_hz, 1.1f * bpfo_hz, FFT_SAMPLES);
         bandEnergies_out[3] = bandEnergy(vReal, freqRes, 0.9f * bpfi_hz, 1.1f * bpfi_hz, FFT_SAMPLES);
-        void setBearingType(bool rollingBearing);
     } else {
         bandEnergies_out[2] = 0.0f;
         bandEnergies_out[3] = 0.0f;

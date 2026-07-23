@@ -169,7 +169,7 @@ void loop() {
 #else
     Serial.printf("\n================= TELEMETRI MONITORING =================");
     Serial.printf("\nRPM ESTIMATED : %7.2f RPM", result.rpm_estimated);
-    Serial.printf("\nANOMALY STATE : %s (ambang batas generik, tanpa kalibrasi)", result.status_label);
+    Serial.printf("\nANOMALY STATE : %s (Mahalanobis D2=%.3f, baseline self-calibrated)", result.status_label, result.mahalanobis_D2);
     Serial.printf("\n------------------- DATA MENTAH SENSOR -----------------");
     Serial.printf("\nGETARAN (RMS) : %7.4f", merged.rms_getaran);
     Serial.printf("\nSUARA (RMS)   : %7.2f", merged.rms_suara);
