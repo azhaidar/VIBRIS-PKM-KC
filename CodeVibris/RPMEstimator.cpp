@@ -12,8 +12,15 @@
 
 static float g_snrCalibBuffer[200];
 static int   g_snrCalibCount = 0;
-static float g_runtimeSNRThreshold = 6.0f;  // fallback awal sebelum kalibrasi selesai
-
+static float g_runtimeSNRThreshold = 2.5f;  // fallback awal -- disesuaikan dari data SNR
+                                              // real motor uji (konsisten 2.1-4.9 di 2 sesi
+                                              // logging terakhir), BUKAN tebakan. Nilai lama
+                                              // (6.0) gak pernah kelewatan oleh SNR asli motor
+                                              // ini, jadi RPM SELALU 0 sepanjang fase kalibrasi
+                                              // -> baseline band-energy selalu dilatih dari
+                                              // data nol. Threshold final tetap dihitung ulang
+                                              // otomatis dari data kalibrasi setelah fase ini
+                                              // selesai (lihat computeSNRThresholdFromCalibration).
 void resetSNRCalibration() { g_snrCalibCount = 0; }
 
 void addSNRCalibrationSample(float snr) {

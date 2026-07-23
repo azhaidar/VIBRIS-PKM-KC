@@ -35,7 +35,6 @@ static void TaskFFTProcessor(void *pvParameters) {
 
     for (;;) {
         if (xQueueReceive(vibrationQueue, &incomingBuffer, portMAX_DELAY) == pdTRUE) {
-            float snrResult = 0.0f;
             FFTProcessor_Process(&incomingBuffer, &fftLocalFeatures, &rpmResult, bandEnergies, &snrResult);
             latestSNR = snrResult;            
         if (rpmResult > 0.0f && lastValidRPM > 0.0f) {

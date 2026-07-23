@@ -72,18 +72,36 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     // Diagnostik: cari & CETAK puncak spektrum di rentang 5-50Hz SELALU --
     // tidak digerbang oleh "reliable". Supaya kamu bisa lihat langsung di
     // Serial Monitor frekuensi apa yang sebenarnya dilihat FFT.
+
+    // BARU: cari 3 PUNCAK TERTINGGI (bukan cuma 1) di rentang 5-50Hz, buat
+    // validasi manual terhadap tachometer/Phyphox. RPM_Estimate() di bawah
+    // TETAP pakai puncak tertinggi tunggal seperti sebelumnya -- ini murni
+    // tambahan untuk membantu kamu mengecek, tidak mengubah cara sistem
+    // memutuskan RPM.
     float freqResDiag = effectiveSampleRate / FFT_SAMPLES;
     int binMinDiag = (int)(FR_MIN_HZ / freqResDiag);
     int binMaxDiag = (int)(FR_MAX_HZ / freqResDiag);
-    float peakAmpDiag = 0.0f;
-    int peakBinDiag = binMinDiag;
+    float top3Amp[3] = {0.0f, 0.0f, 0.0f};
+    int top3Bin[3] = {binMinDiag, binMinDiag, binMinDiag};
     for (int i = binMinDiag; i <= binMaxDiag && i < FFT_SAMPLES / 2; i++) {
-        if (vReal[i] > peakAmpDiag) { peakAmpDiag = (float)vReal[i]; peakBinDiag = i; }
+        float amp = (float)vReal[i];
+        if (amp > top3Amp[0]) {
+            top3Amp[2] = top3Amp[1]; top3Bin[2] = top3Bin[1];
+            top3Amp[1] = top3Amp[0]; top3Bin[1] = top3Bin[0];
+            top3Amp[0] = amp; top3Bin[0] = i;
+        } else if (amp > top3Amp[1]) {
+            top3Amp[2] = top3Amp[1]; top3Bin[2] = top3Bin[1];
+            top3Amp[1] = amp; top3Bin[1] = i;
+        } else if (amp > top3Amp[2]) {
+            top3Amp[2] = amp; top3Bin[2] = i;
+        }
     }
-    float peakFreqHzDiag = peakBinDiag * freqResDiag;
-    Serial.printf("[FFT-DIAG] puncak=%.2fHz (~%.0fRPM) amp=%.2f | snr=%.2f snrOK=%d | rms=%.4f\n",
-        peakFreqHzDiag, peakFreqHzDiag * 60.0f, peakAmpDiag,
+    Serial.printf("[FFT-DIAG] top3: #1=%.2fHz(~%.0fRPM,amp=%.1f) #2=%.2fHz(~%.0fRPM,amp=%.1f) #3=%.2fHz(~%.0fRPM,amp=%.1f) | snr=%.2f snrOK=%d | rms=%.4f\n",
+        top3Bin[0]*freqResDiag, top3Bin[0]*freqResDiag*60.0f, top3Amp[0],
+        top3Bin[1]*freqResDiag, top3Bin[1]*freqResDiag*60.0f, top3Amp[1],
+        top3Bin[2]*freqResDiag, top3Bin[2]*freqResDiag*60.0f, top3Amp[2],
         snr, snrReliable, features->rms_getaran);
+
 
     if (!reliable) {
         reliableStreak = 0;
