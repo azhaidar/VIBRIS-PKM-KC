@@ -14,6 +14,7 @@
 #include "AdaptiveBaselineLearner.h" 
 #include "RPMEstimator.h"
 #include "FFTProcessor.h"
+#include "TinyMLClassifier.h"
 
 // Catatan perubahan (biar klean lain paham kenapa file ini beda
 // dari versi sebelumnya):
@@ -47,7 +48,7 @@ static char groundTruthLabel[16] = "NORMAL";
 
 static float bandBaselineMean[4] = {0.20f, 0.20f, 0.20f, 0.20f};
 static float bandBaselineStd[4]  = {0.10f, 0.10f, 0.10f, 0.10f};
-#define CALIBRATION_DURATION_MS 30000UL   // 30 detik NYATA (millis()), bukan hitungan sample
+#define CALIBRATION_DURATION_MS 90000UL   // 30 detik NYATA (millis()), bukan hitungan sample
 static unsigned long calibrationStartMillis = 0;
 static int currentMachineSlot = -1;   // BARU: -1 = belum ada mesin dipilih
 void setup() {
@@ -56,7 +57,7 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
     Serial.println(F("[SYSTEM] Booting Clean Modular Sensor Core..."));
-
+        TinyML_Init();
     xTaskCreatePinnedToCore(TaskDriverINM, "Task_INM", STACK_TASK_INM, NULL, PRIO_TASK_INM, NULL, CORE_DSP_HIGH_SPEED);
     Scheduler_InitTasks();
     xTaskCreatePinnedToCore(TaskDriverGetaran, "Task_Vib", 3072, NULL, PRIO_TASK_VIB, NULL, CORE_DSP_HIGH_SPEED);
@@ -193,6 +194,13 @@ void loop() {
         result.status_label[sizeof(result.status_label) - 1] = '\0';
     } else {
         result = runDetectionCycle();
+    }
+
+    TinyML_Update(merged, result.rpm_estimated);
+    if (TinyML_HasNewResult()) {
+        strncpy(result.ml_label, TinyML_GetLabel(), sizeof(result.ml_label) - 1);
+        result.ml_label[sizeof(result.ml_label) - 1] = '\0';
+        result.ml_confidence = TinyML_GetConfidence();
     }
 
     Transmitter_SendResult(merged, result, groundTruthLabel);
