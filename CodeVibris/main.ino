@@ -49,6 +49,7 @@ static float bandBaselineMean[4] = {0.20f, 0.20f, 0.20f, 0.20f};
 static float bandBaselineStd[4]  = {0.10f, 0.10f, 0.10f, 0.10f};
 #define CALIBRATION_DURATION_MS 30000UL   // 30 detik NYATA (millis()), bukan hitungan sample
 static unsigned long calibrationStartMillis = 0;
+static int currentMachineSlot = -1;   // BARU: -1 = belum ada mesin dipilih
 void setup() {
     setDiagnosisBandBaseline(bandBaselineMean, bandBaselineStd);
     Transmitter_Init(115200);
@@ -67,7 +68,26 @@ void setup() {
     calibrationStartMillis = millis();
     Serial.println(F("[SYSTEM] Boot Complete. Memulai fase kalibrasi self-baseline (180 detik nyata)."));
 }
+void selectMachineBaselineSlot(int slot) {
+    if (slot == currentMachineSlot) return;   // sudah di mesin ini, gak perlu ngapa-ngapain
+    currentMachineSlot = slot;
 
+    float mean[4], sigmaInv[4][4], stdDev[4];
+    if (loadBaselineFromFlash(slot, mean, sigmaInv, stdDev)) {
+        setFeatureStdDev(stdDev);
+        initializeBaselineLearner(mean, stdDev, sigmaInv);
+
+        float bandMean[4], bandStd[4];
+        if (loadBandBaselineFromFlash(slot, bandMean, bandStd)) {
+            setDiagnosisBandBaseline(bandMean, bandStd);
+        }
+        Serial.printf("[SYSTEM] Baseline mesin #%d dimuat -- deteksi langsung aktif.\n", slot);
+    } else {
+        Serial.printf("[SYSTEM] Belum ada baseline utk mesin #%d. Mulai kalibrasi baru (180 detik)...\n", slot);
+        startCalibrationPhase();
+        calibrationStartMillis = millis();
+    }
+}
 void loop() {
     SensorFeatures merged{};
     bool fresh = getMergedFeatures(&merged);
@@ -107,9 +127,10 @@ void loop() {
             Serial.println(F("[CMD] Reboot ESP32 diminta dari Raspi..."));
             delay(150);  // beri waktu buffer Serial TX selesai terkirim SEBELUM restart
             ESP.restart();
+        } else if (cmd >= '0' && cmd <= '9') {   // BARU: pilih slot baseline mesin (0-5)
+            selectMachineBaselineSlot(cmd - '0');
         }
     }
-
 
     if (!fresh && stillWarmingUp) {
         strncpy(result.status_label, "Warming", sizeof(result.status_label) - 1);
@@ -138,14 +159,14 @@ void loop() {
         if (isLastCalibrationValid()) {
             getFeatureStdDev(stdDev);
             initializeBaselineLearner(mean, stdDev, sigmaInv);
-            saveBaselineToFlash(mean, sigmaInv);
+            saveBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, mean, sigmaInv, stdDev);
 
             // TAMBAHAN: baseline band frekuensi sekarang dihitung dari data
             // kalibrasi NYATA, bukan placeholder 0.20/0.10 selamanya.
             float bandMean[4], bandStd[4];
             computeBandEnergyBaseline(bandMean, bandStd);
             setDiagnosisBandBaseline(bandMean, bandStd);
-            saveBandBaselineToFlash(bandMean, bandStd);
+            saveBandBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, bandMean, bandStd);
             setRuntimeSNRThreshold(computeSNRThresholdFromCalibration());
             Serial.println(F("[SYSTEM] Kalibrasi VALID. Baseline mean/sigma dan band energy siap."));
         } else {

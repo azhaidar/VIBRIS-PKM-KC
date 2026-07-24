@@ -77,15 +77,19 @@ void computeBandEnergyBaseline(float meanOutput[4], float stdOutput[4]) {
     Serial.printf("[Calibrator] Band energy baseline selesai dari %d sample.\n", bandCalibrationSampleCount);
 }
 
-void saveBandBaselineToFlash(float mean[4], float std[4]) {
-    flashStorage.begin("baseline_band", false);
+
+void saveBandBaselineToFlash(int slot, float mean[4], float std[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "bandbase%d", slot);
+    flashStorage.begin(ns, false);
     flashStorage.putBytes("mean", mean, sizeof(float) * 4);
     flashStorage.putBytes("std", std, sizeof(float) * 4);
     flashStorage.end();
 }
-
-bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]) {
-    flashStorage.begin("baseline_band", true);
+bool loadBandBaselineFromFlash(int slot, float meanOutput[4], float stdOutput[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "bandbase%d", slot);
+    flashStorage.begin(ns, true);
     size_t meanLen = flashStorage.getBytesLength("mean");
     size_t stdLen  = flashStorage.getBytesLength("std");
     if (meanLen != sizeof(float)*4 || stdLen != sizeof(float)*4) {
@@ -224,27 +228,39 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
     Serial.printf("[Calibrator] Baseline selesai dari %d sample.\n", calibrationSampleCount);
 }
 
-void saveBaselineToFlash(float mean[4], float sigmaInverse[4][4]) {
-    flashStorage.begin(NVS_NAMESPACE, false); // false = read-write mode
+void saveBaselineToFlash(int slot, float mean[4], float sigmaInverse[4][4], float stdDev[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "baseline%d", slot);   // "baseline0".."baseline5" -- namespace terpisah per mesin
+    flashStorage.begin(ns, false);
     flashStorage.putBytes("mean", mean, sizeof(float) * 4);
     flashStorage.putBytes("sigmaInv", sigmaInverse, sizeof(float) * 16);
+    flashStorage.putBytes("stdDev", stdDev, sizeof(float) * 4);
     flashStorage.end();
-    Serial.println(F("[Calibrator] Baseline tersimpan ke flash (NVS)."));
+    Serial.printf("[Calibrator] Baseline mesin #%d tersimpan ke flash.\n", slot);
 }
-
-bool loadBaselineFromFlash(float meanOutput[4], float sigmaInverseOutput[4][4]) {
-    flashStorage.begin(NVS_NAMESPACE, true); // true = read-only mode
-
+bool loadBaselineFromFlash(int slot, float meanOutput[4], float sigmaInverseOutput[4][4], float stdDevOutput[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "baseline%d", slot);
+    flashStorage.begin(ns, true);
     size_t meanLen = flashStorage.getBytesLength("mean");
     size_t sigmaLen = flashStorage.getBytesLength("sigmaInv");
-
-    // Kalau key belum pernah disimpan (device baru pertama kali nyala),
-    // panjangnya 0 — jangan dipaksa baca, itu akan mengisi buffer sampah.
-    if (meanLen != sizeof(float) * 4 || sigmaLen != sizeof(float) * 16) {
+    size_t stdLen = flashStorage.getBytesLength("stdDev");
+    if (meanLen != sizeof(float) * 4 || sigmaLen != sizeof(float) * 16 || stdLen != sizeof(float) * 4) {
         flashStorage.end();
-        Serial.println(F("[Calibrator] Tidak ada baseline tersimpan di flash."));
+        Serial.printf("[Calibrator] Tidak ada baseline tersimpan untuk mesin #%d.\n", slot);
         return false;
     }
+    flashStorage.getBytes("mean", meanOutput, meanLen);
+    flashStorage.getBytes("sigmaInv", sigmaInverseOutput, sigmaLen);
+    flashStorage.getBytes("stdDev", stdDevOutput, stdLen);
+    flashStorage.end();
+    Serial.printf("[Calibrator] Baseline mesin #%d berhasil dimuat dari flash.\n", slot);
+    return true;
+}
+
+void setFeatureStdDev(float stdDev[4]) {
+    for (int i = 0; i < 4; i++) featureStdDev[i] = stdDev[i];
+}
 
     flashStorage.getBytes("mean", meanOutput, meanLen);
     flashStorage.getBytes("sigmaInv", sigmaInverseOutput, sigmaLen);

@@ -755,6 +755,7 @@ class Dashboard(QWidget):
         m = self.machines[idx]
         self.lbl_machine_active.setText(f"{m['icon']}  {m['name']}")
         self._send_command(m["bearing_cmd"])
+        self._send_command(str(idx))   # BARU: kirim nomor slot (0-5) buat baseline per-mesin
         self._rebuild_machine_grid()
 
     # ===================== HALAMAN 6 (TERSEMBUNYI): DETAIL REKAMAN (INLINE, BUKAN WINDOW BARU) =====================
