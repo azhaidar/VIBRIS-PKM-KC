@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <Arduino.h>
+#include "config.h"
 
 
 // FIX: kalibrasi sekarang digerbang WAKTU (180 detik nyata via millis() di
@@ -76,16 +77,78 @@ void computeBandEnergyBaseline(float meanOutput[4], float stdOutput[4]) {
     }
     Serial.printf("[Calibrator] Band energy baseline selesai dari %d sample.\n", bandCalibrationSampleCount);
 }
+static float audioCalibrationBuffer[CALIBRATION_MAX_SAMPLES][AUDIO_BAND_COUNT];
+static int   audioCalibrationSampleCount = 0;
 
-void saveBandBaselineToFlash(float mean[4], float std[4]) {
-    flashStorage.begin("baseline_band", false);
+bool addAudioBandEnergyCalibrationSample(float audioBandEnergies[AUDIO_BAND_COUNT]) {
+    if (!calibrationActive) return false;
+    if (audioCalibrationSampleCount >= CALIBRATION_MAX_SAMPLES) return false;
+    for (int i = 0; i < AUDIO_BAND_COUNT; i++) {
+        audioCalibrationBuffer[audioCalibrationSampleCount][i] = audioBandEnergies[i];
+    }
+    audioCalibrationSampleCount++;
+    return true;
+}
+
+void computeAudioBandBaseline(float meanOutput[AUDIO_BAND_COUNT], float stdOutput[AUDIO_BAND_COUNT]) {
+    if (audioCalibrationSampleCount < 2) {
+        Serial.println(F("[Calibrator] ERROR: sample audio band energy terlalu sedikit."));
+        for (int i = 0; i < AUDIO_BAND_COUNT; i++) { meanOutput[i] = 0.2f; stdOutput[i] = 0.1f; }
+        return;
+    }
+    for (int f = 0; f < AUDIO_BAND_COUNT; f++) {
+        double sum = 0.0;
+        for (int i = 0; i < audioCalibrationSampleCount; i++) sum += audioCalibrationBuffer[i][f];
+        meanOutput[f] = (float)(sum / audioCalibrationSampleCount);
+    }
+    for (int f = 0; f < AUDIO_BAND_COUNT; f++) {
+        double sumSqDiff = 0.0;
+        for (int i = 0; i < audioCalibrationSampleCount; i++) {
+            double d = audioCalibrationBuffer[i][f] - meanOutput[f];
+            sumSqDiff += d * d;
+        }
+        stdOutput[f] = (float)sqrt(sumSqDiff / (audioCalibrationSampleCount - 1));
+        if (stdOutput[f] < 1e-4f) stdOutput[f] = 1e-4f;
+    }
+    Serial.printf("[Calibrator] Audio band baseline selesai dari %d sample.\n", audioCalibrationSampleCount);
+}
+
+void saveAudioBandBaselineToFlash(int slot, float mean[AUDIO_BAND_COUNT], float std[AUDIO_BAND_COUNT]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "audiobase%d", slot);
+    flashStorage.begin(ns, false);
+    flashStorage.putBytes("mean", mean, sizeof(float) * AUDIO_BAND_COUNT);
+    flashStorage.putBytes("std", std, sizeof(float) * AUDIO_BAND_COUNT);
+    flashStorage.end();
+}
+
+bool loadAudioBandBaselineFromFlash(int slot, float meanOutput[AUDIO_BAND_COUNT], float stdOutput[AUDIO_BAND_COUNT]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "audiobase%d", slot);
+    flashStorage.begin(ns, true);
+    size_t meanLen = flashStorage.getBytesLength("mean");
+    size_t stdLen  = flashStorage.getBytesLength("std");
+    if (meanLen != sizeof(float) * AUDIO_BAND_COUNT || stdLen != sizeof(float) * AUDIO_BAND_COUNT) {
+        flashStorage.end();
+        return false;
+    }
+    flashStorage.getBytes("mean", meanOutput, meanLen);
+    flashStorage.getBytes("std", stdOutput, stdLen);
+    flashStorage.end();
+    return true;
+}
+void saveBandBaselineToFlash(int slot, float mean[4], float std[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "bandbase%d", slot);
+    flashStorage.begin(ns, false);
     flashStorage.putBytes("mean", mean, sizeof(float) * 4);
     flashStorage.putBytes("std", std, sizeof(float) * 4);
     flashStorage.end();
 }
-
-bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]) {
-    flashStorage.begin("baseline_band", true);
+bool loadBandBaselineFromFlash(int slot, float meanOutput[4], float stdOutput[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "bandbase%d", slot);
+    flashStorage.begin(ns, true);
     size_t meanLen = flashStorage.getBytesLength("mean");
     size_t stdLen  = flashStorage.getBytesLength("std");
     if (meanLen != sizeof(float)*4 || stdLen != sizeof(float)*4) {
@@ -224,35 +287,41 @@ void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4])
     Serial.printf("[Calibrator] Baseline selesai dari %d sample.\n", calibrationSampleCount);
 }
 
-void saveBaselineToFlash(float mean[4], float sigmaInverse[4][4]) {
-    flashStorage.begin(NVS_NAMESPACE, false); // false = read-write mode
+void saveBaselineToFlash(int slot, float mean[4], float sigmaInverse[4][4], float stdDev[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "baseline%d", slot);   // "baseline0".."baseline5" -- namespace terpisah per mesin
+    flashStorage.begin(ns, false);
     flashStorage.putBytes("mean", mean, sizeof(float) * 4);
     flashStorage.putBytes("sigmaInv", sigmaInverse, sizeof(float) * 16);
+    flashStorage.putBytes("stdDev", stdDev, sizeof(float) * 4);
     flashStorage.end();
-    Serial.println(F("[Calibrator] Baseline tersimpan ke flash (NVS)."));
+    Serial.printf("[Calibrator] Baseline mesin #%d tersimpan ke flash.\n", slot);
 }
-
-bool loadBaselineFromFlash(float meanOutput[4], float sigmaInverseOutput[4][4]) {
-    flashStorage.begin(NVS_NAMESPACE, true); // true = read-only mode
-
+bool loadBaselineFromFlash(int slot, float meanOutput[4], float sigmaInverseOutput[4][4], float stdDevOutput[4]) {
+    char ns[16];
+    snprintf(ns, sizeof(ns), "baseline%d", slot);
+    flashStorage.begin(ns, true);
     size_t meanLen = flashStorage.getBytesLength("mean");
     size_t sigmaLen = flashStorage.getBytesLength("sigmaInv");
-
-    // Kalau key belum pernah disimpan (device baru pertama kali nyala),
-    // panjangnya 0 — jangan dipaksa baca, itu akan mengisi buffer sampah.
-    if (meanLen != sizeof(float) * 4 || sigmaLen != sizeof(float) * 16) {
+    size_t stdLen = flashStorage.getBytesLength("stdDev");
+    if (meanLen != sizeof(float) * 4 || sigmaLen != sizeof(float) * 16 || stdLen != sizeof(float) * 4) {
         flashStorage.end();
-        Serial.println(F("[Calibrator] Tidak ada baseline tersimpan di flash."));
+        Serial.printf("[Calibrator] Tidak ada baseline tersimpan untuk mesin #%d.\n", slot);
         return false;
     }
-
     flashStorage.getBytes("mean", meanOutput, meanLen);
     flashStorage.getBytes("sigmaInv", sigmaInverseOutput, sigmaLen);
+    flashStorage.getBytes("stdDev", stdDevOutput, stdLen);
     flashStorage.end();
-
-    Serial.println(F("[Calibrator] Baseline berhasil dimuat dari flash."));
+    Serial.printf("[Calibrator] Baseline mesin #%d berhasil dimuat dari flash.\n", slot);
     return true;
 }
+
+void setFeatureStdDev(float stdDev[4]) {
+    for (int i = 0; i < 4; i++) featureStdDev[i] = stdDev[i];
+}
+
+
 
 // BARU: getter supaya file lain (MahalanobisDetector.cpp) bisa mengambil
 // featureStdDev yang sama persis dipakai saat kalibrasi, untuk menstandardisasi

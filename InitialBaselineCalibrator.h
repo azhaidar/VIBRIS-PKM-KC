@@ -39,10 +39,18 @@ void startCalibrationPhase();
 bool addCalibrationSample(SensorFeatures sample);
 void computeInitialBaseline(float meanOutput[4], float sigmaInverseOutput[4][4]);
 void getFeatureStdDev(float stdDevOutput[4]);
-void saveBaselineToFlash(float mean[4], float sigmaInverse[4][4]);
-bool loadBaselineFromFlash(float meanOutput[4], float sigmaInverseOutput[4][4]);
+void setFeatureStdDev(float stdDev[4]);  // BARU: buat "suntik" stdDev hasil load dari flash
+void saveBaselineToFlash(int slot, float mean[4], float sigmaInverse[4][4], float stdDev[4]);
+bool loadBaselineFromFlash(int slot, float meanOutput[4], float sigmaInverseOutput[4][4], float stdDevOutput[4]);
+
+// TAMBAHKAN 4 baris ini (dekat prototype band getaran yang udah ada):
+bool addAudioBandEnergyCalibrationSample(float audioBandEnergies[AUDIO_BAND_COUNT]);
+void computeAudioBandBaseline(float meanOutput[AUDIO_BAND_COUNT], float stdOutput[AUDIO_BAND_COUNT]);
+void saveAudioBandBaselineToFlash(int slot, float mean[AUDIO_BAND_COUNT], float std[AUDIO_BAND_COUNT]);
+bool loadAudioBandBaselineFromFlash(int slot, float meanOutput[AUDIO_BAND_COUNT], float stdOutput[AUDIO_BAND_COUNT]);
+
 bool isLastCalibrationValid();
 bool addBandEnergyCalibrationSample(float bandEnergies[4]);
 void computeBandEnergyBaseline(float meanOutput[4], float stdOutput[4]);
-void saveBandBaselineToFlash(float mean[4], float std[4]);
-bool loadBandBaselineFromFlash(float meanOutput[4], float stdOutput[4]);
+void saveBandBaselineToFlash(int slot, float mean[4], float std[4]);
+bool loadBandBaselineFromFlash(int slot, float meanOutput[4], float stdOutput[4]);

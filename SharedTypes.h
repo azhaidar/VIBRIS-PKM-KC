@@ -64,3 +64,6 @@ static const BearingSpec ACTIVE_BEARING_SPEC = {8, 6.35f, 25.0f, 0.0f, "6202 (15
 // DIDEFINISIKAN cuma sekali di FFTProcessor.cpp (lihat FIX 2).
 // Supaya semua file (main.ino, FFTProcessor.cpp) pegang variabel YANG SAMA.
 extern BearingSpec currentBearingSpec;
+
+    char ml_label[16];          // BARU — hasil klasifikasi TinyML
+    float ml_confidence;        // BARU

@@ -14,6 +14,7 @@
 #include "AdaptiveBaselineLearner.h" 
 #include "RPMEstimator.h"
 #include "FFTProcessor.h"
+#include "TinyMLClassifier.h"
 
 // Catatan perubahan (biar klean lain paham kenapa file ini beda
 // dari versi sebelumnya):
@@ -49,13 +50,14 @@ static float bandBaselineMean[4] = {0.20f, 0.20f, 0.20f, 0.20f};
 static float bandBaselineStd[4]  = {0.10f, 0.10f, 0.10f, 0.10f};
 #define CALIBRATION_DURATION_MS 30000UL   // 30 detik NYATA (millis()), bukan hitungan sample
 static unsigned long calibrationStartMillis = 0;
+static int currentMachineSlot = -1;   // BARU: -1 = belum ada mesin dipilih
 void setup() {
     setDiagnosisBandBaseline(bandBaselineMean, bandBaselineStd);
     Transmitter_Init(115200);
     Serial.begin(115200);
     delay(2000);
     Serial.println(F("[SYSTEM] Booting Clean Modular Sensor Core..."));
-
+        TinyML_Init();
     xTaskCreatePinnedToCore(TaskDriverINM, "Task_INM", STACK_TASK_INM, NULL, PRIO_TASK_INM, NULL, CORE_DSP_HIGH_SPEED);
     Scheduler_InitTasks();
     xTaskCreatePinnedToCore(TaskDriverGetaran, "Task_Vib", 3072, NULL, PRIO_TASK_VIB, NULL, CORE_DSP_HIGH_SPEED);
@@ -67,7 +69,30 @@ void setup() {
     calibrationStartMillis = millis();
     Serial.println(F("[SYSTEM] Boot Complete. Memulai fase kalibrasi self-baseline (180 detik nyata)."));
 }
+void selectMachineBaselineSlot(int slot) {
+    if (slot == currentMachineSlot) return;   // sudah di mesin ini, gak perlu ngapa-ngapain
+    currentMachineSlot = slot;
 
+    float mean[4], sigmaInv[4][4], stdDev[4];
+    if (loadBaselineFromFlash(slot, mean, sigmaInv, stdDev)) {
+        setFeatureStdDev(stdDev);
+        initializeBaselineLearner(mean, stdDev, sigmaInv);
+
+        float bandMean[4], bandStd[4];
+        if (loadBandBaselineFromFlash(slot, bandMean, bandStd)) {
+            setDiagnosisBandBaseline(bandMean, bandStd);
+        }
+        float audioMean[AUDIO_BAND_COUNT], audioStd[AUDIO_BAND_COUNT];
+        if (loadAudioBandBaselineFromFlash(slot, audioMean, audioStd)) {
+            setAudioBandBaseline(audioMean, audioStd);
+        }
+        Serial.printf("[SYSTEM] Baseline mesin #%d dimuat -- deteksi langsung aktif.\n", slot);
+    } else {
+        Serial.printf("[SYSTEM] Belum ada baseline utk mesin #%d. Mulai kalibrasi baru (180 detik)...\n", slot);
+        startCalibrationPhase();
+        calibrationStartMillis = millis();
+    }
+}
 void loop() {
     SensorFeatures merged{};
     bool fresh = getMergedFeatures(&merged);
@@ -103,8 +128,15 @@ void loop() {
         } else if (cmd == 'F') {   // 'F' = ground truth bearing fault disimulasikan
             strncpy(groundTruthLabel, "BEARING_FAULT", sizeof(groundTruthLabel) - 1);
             Serial.println(F("[TEST] Ground truth: BEARING_FAULT"));
+        } else if (cmd == 'X') {   // 'X' = Raspi minta ESP32 REBOOT PENUH
+            Serial.println(F("[CMD] Reboot ESP32 diminta dari Raspi..."));
+            delay(150);  // beri waktu buffer Serial TX selesai terkirim SEBELUM restart
+            ESP.restart();
+        } else if (cmd >= '0' && cmd <= '9') {   // BARU: pilih slot baseline mesin (0-5)
+            selectMachineBaselineSlot(cmd - '0');
         }
     }
+
     if (!fresh && stillWarmingUp) {
         strncpy(result.status_label, "Warming", sizeof(result.status_label) - 1);
         result.status_label[sizeof(result.status_label) - 1] = '\0';
@@ -123,6 +155,10 @@ void loop() {
         Scheduler_GetLatestBandEnergies(bandEnergies);
         addBandEnergyCalibrationSample(bandEnergies);
 
+        float audioBandEnergies[AUDIO_BAND_COUNT];
+        Scheduler_GetLatestAudioBandEnergies(audioBandEnergies);
+        addAudioBandEnergyCalibrationSample(audioBandEnergies);
+
         strncpy(result.status_label, "Calibrating", sizeof(result.status_label) - 1);
         result.status_label[sizeof(result.status_label) - 1] = '\0';
     } else if (!isBaselineLearnerReady()) {
@@ -132,14 +168,21 @@ void loop() {
         if (isLastCalibrationValid()) {
             getFeatureStdDev(stdDev);
             initializeBaselineLearner(mean, stdDev, sigmaInv);
-            saveBaselineToFlash(mean, sigmaInv);
+            saveBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, mean, sigmaInv, stdDev);
 
             // TAMBAHAN: baseline band frekuensi sekarang dihitung dari data
             // kalibrasi NYATA, bukan placeholder 0.20/0.10 selamanya.
             float bandMean[4], bandStd[4];
             computeBandEnergyBaseline(bandMean, bandStd);
             setDiagnosisBandBaseline(bandMean, bandStd);
-            saveBandBaselineToFlash(bandMean, bandStd);
+            saveBandBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, bandMean, bandStd);
+
+            float audioMean[AUDIO_BAND_COUNT], audioStd[AUDIO_BAND_COUNT];
+            computeAudioBandBaseline(audioMean, audioStd);
+            setAudioBandBaseline(audioMean, audioStd);
+            saveAudioBandBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, audioMean, audioStd);
+
+            setRuntimeSNRThreshold(computeSNRThresholdFromCalibration());
             setRuntimeSNRThreshold(computeSNRThresholdFromCalibration());
             Serial.println(F("[SYSTEM] Kalibrasi VALID. Baseline mean/sigma dan band energy siap."));
         } else {
@@ -151,6 +194,13 @@ void loop() {
         result.status_label[sizeof(result.status_label) - 1] = '\0';
     } else {
         result = runDetectionCycle();
+    }
+
+    TinyML_Update(merged, result.rpm_estimated);
+    if (TinyML_HasNewResult()) {
+        strncpy(result.ml_label, TinyML_GetLabel(), sizeof(result.ml_label) - 1);
+        result.ml_label[sizeof(result.ml_label) - 1] = '\0';
+        result.ml_confidence = TinyML_GetConfidence();
     }
 
     Transmitter_SendResult(merged, result, groundTruthLabel);

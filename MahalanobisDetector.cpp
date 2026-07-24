@@ -51,6 +51,13 @@ void setDiagnosisBandBaseline(float bandMean[4], float bandStd[4]) {
     }
     diagBaselineReady = true;
 }
+// TAMBAHKAN fungsi baru ini:
+void setAudioBandBaseline(float mean[AUDIO_BAND_COUNT], float std[AUDIO_BAND_COUNT]) {
+    for (int i = 0; i < AUDIO_BAND_COUNT; i++) {
+        audioBandMean[i] = mean[i];
+        audioBandVar[i]  = std[i] * std[i];
+    }
+}
 
 // BARU: EMA generik band mean/variance, dipakai untuk band getaran (n=4) & audio (n=3)
 static void updateBandBaselineIfNormal(float mean[], float variance[], int n,
