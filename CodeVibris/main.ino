@@ -81,6 +81,10 @@ void selectMachineBaselineSlot(int slot) {
         if (loadBandBaselineFromFlash(slot, bandMean, bandStd)) {
             setDiagnosisBandBaseline(bandMean, bandStd);
         }
+        float audioMean[AUDIO_BAND_COUNT], audioStd[AUDIO_BAND_COUNT];
+        if (loadAudioBandBaselineFromFlash(slot, audioMean, audioStd)) {
+            setAudioBandBaseline(audioMean, audioStd);
+        }
         Serial.printf("[SYSTEM] Baseline mesin #%d dimuat -- deteksi langsung aktif.\n", slot);
     } else {
         Serial.printf("[SYSTEM] Belum ada baseline utk mesin #%d. Mulai kalibrasi baru (180 detik)...\n", slot);
@@ -150,6 +154,10 @@ void loop() {
         Scheduler_GetLatestBandEnergies(bandEnergies);
         addBandEnergyCalibrationSample(bandEnergies);
 
+        float audioBandEnergies[AUDIO_BAND_COUNT];
+        Scheduler_GetLatestAudioBandEnergies(audioBandEnergies);
+        addAudioBandEnergyCalibrationSample(audioBandEnergies);
+
         strncpy(result.status_label, "Calibrating", sizeof(result.status_label) - 1);
         result.status_label[sizeof(result.status_label) - 1] = '\0';
     } else if (!isBaselineLearnerReady()) {
@@ -167,6 +175,13 @@ void loop() {
             computeBandEnergyBaseline(bandMean, bandStd);
             setDiagnosisBandBaseline(bandMean, bandStd);
             saveBandBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, bandMean, bandStd);
+
+            float audioMean[AUDIO_BAND_COUNT], audioStd[AUDIO_BAND_COUNT];
+            computeAudioBandBaseline(audioMean, audioStd);
+            setAudioBandBaseline(audioMean, audioStd);
+            saveAudioBandBaselineToFlash(currentMachineSlot >= 0 ? currentMachineSlot : 0, audioMean, audioStd);
+
+            setRuntimeSNRThreshold(computeSNRThresholdFromCalibration());
             setRuntimeSNRThreshold(computeSNRThresholdFromCalibration());
             Serial.println(F("[SYSTEM] Kalibrasi VALID. Baseline mean/sigma dan band energy siap."));
         } else {

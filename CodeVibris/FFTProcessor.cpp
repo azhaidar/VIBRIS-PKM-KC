@@ -24,6 +24,10 @@ void setBearingType(bool rollingBearing) {
 
 static float stableRPM = 0.0f;
 static int reliableStreak = 0;
+
+#define SPECTRAL_AVG_COUNT 6   // rata-rata 6 siklus FFT sebelum cari puncak/SNR
+static double avgMagnitude[FFT_SAMPLES / 2] = {0};
+static int avgAccumCount = 0;
 void FFTProcessor_Init() {}
 
 float bandEnergy(double *magnitude, float freqResolution, float f_low, float f_high, int n) {
@@ -50,13 +54,48 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
     FFT.compute(FFTDirection::Forward);
     FFT.complexToMagnitude();
+    FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
+    FFT.compute(FFTDirection::Forward);
+    FFT.complexToMagnitude();
+
+    // BARU: akumulasi spektrum mentah dulu sebelum dipakai cari puncak/SNR.
+    // Noise acak saling membatalkan kalau dirata-rata, puncak motor yang
+    // konsisten tetap kuat -- SNR naik ~sqrt(SPECTRAL_AVG_COUNT) kali lipat.
+    for (int i = 0; i < FFT_SAMPLES / 2; i++) {
+        avgMagnitude[i] += vReal[i];
+    }
+    avgAccumCount++;
 
     float sumSquare = 0;
     for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
     features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
 
+    for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
+    features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
+
+    // Belum cukup siklus terakumulasi -- pertahankan RPM stabil sebelumnya,
+    // jangan proses puncak/SNR dulu (datanya belum "matang").
+    if (avgAccumCount < SPECTRAL_AVG_COUNT) {
+        *rpm_out = stableRPM;
+        if (snr_out) *snr_out = 0.0f;
+        for (int i = 0; i < 4; i++) bandEnergies_out[i] = 0.0f;
+        return;
+    }
+
+    // Cukup akumulasi -- rata-ratakan spektrumnya, timpa vReal[] dengan hasil
+    // rata-rata (bandEnergy/RPM_Estimate di bawah cuma pernah baca vReal[0..n/2],
+    // jadi aman ditimpa segini), lalu reset akumulator buat siklus berikutnya.
+    for (int i = 0; i < FFT_SAMPLES / 2; i++) {
+        vReal[i] = avgMagnitude[i] / SPECTRAL_AVG_COUNT;
+        avgMagnitude[i] = 0.0;
+    }
+    avgAccumCount = 0;
+
+
     float effectiveSampleRate = (input->actual_rate_hz > 1.0f) ?
         input->actual_rate_hz : SAMPLE_RATE;
+
+
     float snr = 0.0f;
     bool snrReliable = RPM_IsSignalReliable(vReal, FFT_SAMPLES, effectiveSampleRate, &snr);
     if (snr_out) *snr_out = snr;

@@ -112,6 +112,7 @@ void TaskDriverArus(void *pvParameters) {
         float meanSquare      = (float)(sumSquared / ARUS_RMS_SAMPLE_COUNT);
         float rmsADC          = sqrtf(meanSquare);
         g_lastRawADC          = rmsADC;
+        Serial.printf("[ARUS-DIAG] dcBaseline=%.2f rmsADC=%.4f\n", dcBaseline, rmsADC);
         // FIX 5: Dokumentasi derivasi konversi
         // rmsADC adalah nilai RMS dalam satuan ADC count (bukan Volt, bukan Ampere).
         // ARUS_CAL_FACTOR mengkonversi langsung ke Ampere.
