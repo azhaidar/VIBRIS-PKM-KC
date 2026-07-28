@@ -33,7 +33,6 @@ void Transmitter_SendResult(SensorFeatures features, DetectionResult result, con
         "\"diagnosis\":\"%s\",\"diag_conf\":%.2f,"
         "\"e_audio_low\":%.4f,\"e_audio_mid\":%.4f,\"e_audio_high\":%.4f,"
         "\"audio_diagnosis\":\"%s\",\"audio_diag_conf\":%.2f,"
-        "\"ml_label\":\"%s\",\"ml_conf\":%.2f,"
         "\"ground_truth\":\"%s\""
         "}\n",
         features.rms_getaran, rmsX, rmsY, rmsZ,
@@ -44,7 +43,6 @@ void Transmitter_SendResult(SensorFeatures features, DetectionResult result, con
         result.diagnosis_label, result.diagnosis_confidence,
         audioBandEnergies[0], audioBandEnergies[1], audioBandEnergies[2],
         result.audio_diagnosis_label, result.audio_diagnosis_confidence,
-        result.ml_label, result.ml_confidence,
         groundTruthLabel
     );
 }

@@ -15,8 +15,8 @@
 #define PIN_INM_I2S_SCK     18  // I2S Continuous Serial Clock
 // Sensor Suhu (DS18H / DS18B20) - Connected to OneWire Bus
 //#define PIN_DS18B20_DATA    5   // OneWire Digital I/O
-#define PIN_MLX_SCL         8   // I2C Clock GY-906 (MLX90614)
-#define PIN_MLX_SDA         3   // I2C Data GY-906 (MLX90614)
+#define PIN_MLX_SCL         9   // I2C Clock GY-906 (MLX90614)
+#define PIN_MLX_SDA         10   // I2C Data GY-906 (MLX90614)
 // ===================================================================
 // 2. FREERTOS TASK ARCHITECTURE (CORES, PRIORITIES, & STACKS)
 // ===================================================================
@@ -53,7 +53,7 @@
 #define FFT_SAMPLES          256     // Jumlah sampel FFT getaran (Kunci lintas file)
 // Sistem Monitoring Configuration
 #define TICK_DELAY_REPORT    100   // Interval Serial Print pelaporan data (ms)
-#define VIBRATION_SAMPLE_RATE_HZ 400U
+#define VIBRATION_SAMPLE_RATE_HZ 380U
 #define VIBRATION_SAMPLE_PERIOD_US \
     (1000000UL / VIBRATION_SAMPLE_RATE_HZ)
 
