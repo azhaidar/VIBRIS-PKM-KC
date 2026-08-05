@@ -54,9 +54,7 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
     FFT.compute(FFTDirection::Forward);
     FFT.complexToMagnitude();
-    FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
-    FFT.compute(FFTDirection::Forward);
-    FFT.complexToMagnitude();
+
 
     // BARU: akumulasi spektrum mentah dulu sebelum dipakai cari puncak/SNR.
     // Noise acak saling membatalkan kalau dirata-rata, puncak motor yang
@@ -67,8 +65,6 @@ void FFTProcessor_Process(VibrationBuffer *input, SensorFeatures *features,
     avgAccumCount++;
 
     float sumSquare = 0;
-    for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
-    features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
 
     for (int i = 0; i < FFT_SAMPLES; i++) sumSquare += input->samples[i] * input->samples[i];
     features->rms_getaran = sqrt(sumSquare / FFT_SAMPLES);
