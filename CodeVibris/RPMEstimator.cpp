@@ -133,3 +133,31 @@ float RPM_ComputeBPFI(float fr_hz, int n_balls, float d_ball, float D_pitch, flo
     float phi_rad = phi_deg * (PI / 180.0f);
     return (n_balls / 2.0f) * fr_hz * (1.0f + (d_ball / D_pitch) * cos(phi_rad));
 }
+
+// BSF — Ball Spin Frequency: cacat pada bola bearing itu sendiri
+// Dari paper IJERT 2013 (ball-bearing-fault-detection) persamaan (5)
+float RPM_ComputeBSF(float fr_hz, int n_balls, float d_ball, 
+                     float D_pitch, float phi_deg);
+
+// FTF — Fundamental Train Frequency: cacat pada sangkar/cage bearing  
+// Dari paper IJERT 2013 persamaan (3), inner race rotating version
+float RPM_ComputeFTF(float fr_hz, float d_ball, 
+                     float D_pitch, float phi_deg);
+// TAMBAH setelah closing brace RPM_ComputeBPFI
+
+float RPM_ComputeBSF(float fr_hz, int n_balls, float d_ball,
+                     float D_pitch, float phi_deg) {
+    // Rumus dari gambar bearing yang kamu upload:
+    // BSF = (Pd/2Bd) * fr * [1 - (Bd/Pd * cos(phi))^2]
+    float phi_rad = phi_deg * (PI / 180.0f);
+    float ratio   = (d_ball / D_pitch) * cosf(phi_rad);
+    return (D_pitch / (2.0f * d_ball)) * fr_hz * (1.0f - ratio * ratio);
+}
+
+float RPM_ComputeFTF(float fr_hz, float d_ball,
+                     float D_pitch, float phi_deg) {
+    // Rumus dari gambar bearing yang kamu upload:
+    // FTF = (fr/2) * [1 - (Bd/Pd * cos(phi))]
+    float phi_rad = phi_deg * (PI / 180.0f);
+    return (fr_hz / 2.0f) * (1.0f - (d_ball / D_pitch) * cosf(phi_rad));
+}

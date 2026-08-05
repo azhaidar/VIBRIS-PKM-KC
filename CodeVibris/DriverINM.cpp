@@ -58,7 +58,7 @@ void TaskDriverINM(void *pvParameters) {
             for (int i = 0; i < samples_read; i++) {
                 // INMP441 menghasilkan data terjustifikasi kiri (Left-Justified) 24-bit didalam slot 32-bit.
                 // Lakukan shift kanan sebanyak 14-bit untuk mendapatkan nilai integer bertanda yang valid.
-                int32_t cleanSample = i2s_raw_buffer[i] >> 14;
+                int32_t cleanSample = i2s_raw_buffer[i] >> 8;
                 
                 // Akumulasi kuadrat sinyal audio untuk kalkulasi daya suara (RMS)
                 sumSquaredValues += (int64_t)cleanSample * (int64_t)cleanSample;

@@ -74,6 +74,15 @@ bisa diestimasi otomatis, harus dicatat manual saat pengujian.
 */
 float RPM_ComputeBPFO(float fr_hz, int n_balls, float d_ball, float D_pitch, float phi_deg);
 float RPM_ComputeBPFI(float fr_hz, int n_balls, float d_ball, float D_pitch, float phi_deg);
+// BSF — Ball Spin Frequency: cacat pada bola bearing
+// Sumber: paper IJERT 2013 (ball-bearing-fault-detection) persamaan (5)
+float RPM_ComputeBSF(float fr_hz, int n_balls, float d_ball,
+                     float D_pitch, float phi_deg);
+
+// FTF — Fundamental Train Frequency: cacat pada sangkar/cage bearing
+// Sumber: paper IJERT 2013 persamaan (3)
+float RPM_ComputeFTF(float fr_hz, float d_ball,
+                     float D_pitch, float phi_deg);
 bool RPM_IsSignalReliable(double *magnitude, int n, float sampleRate, float *snrOut);
 void resetSNRCalibration();
 void addSNRCalibrationSample(float snr);

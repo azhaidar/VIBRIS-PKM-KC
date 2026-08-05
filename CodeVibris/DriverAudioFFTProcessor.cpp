@@ -53,9 +53,7 @@ void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out
     audioFFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
     audioFFT.compute(FFTDirection::Forward);
     audioFFT.complexToMagnitude();
-    for (int i = 0; i < AUDIO_FFT_SAMPLES / 2; i++) {
-    aReal[i] = aReal[i] / (double)AUDIO_FFT_SAMPLES;
-}
+
 
     float freqRes = (float)AUDIO_SAMPLE_RATE / AUDIO_FFT_SAMPLES;
 
