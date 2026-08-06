@@ -33,7 +33,7 @@ static float audioBandEnergy(double *magnitude, float freqResolution,
     double energySum = 0;
     int binCount = 0;
     for (int i = binLow; i <= binHigh; i++) {
-        energySum += magnitude[i] * magnitude[i];
+        energySum += magnitude[i];
         binCount++;
     }
     if (binCount == 0) return 0.0f;
