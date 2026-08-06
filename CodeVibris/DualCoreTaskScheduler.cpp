@@ -24,6 +24,9 @@ static float latestRmsX = 0.0f;
 static float latestRmsZ = 0.0f;
 static float latestRmsY = 0.0f;
 
+static volatile float latestRoughness = 0.0f;
+static volatile float latestBrightness = 0.0f;
+
 static void TaskFFTProcessor(void *pvParameters) {
     static VibrationBuffer incomingBuffer;
     float rpmResult = 0.0f;
@@ -74,7 +77,11 @@ static void TaskAudioFFTProcessor(void *pvParameters) {
 
     for (;;) {
         if (xQueueReceive(audioQueue, &incomingAudio, portMAX_DELAY) == pdTRUE) {
-            DriverAudioFFTProcessor_Process(&incomingAudio, bandEnergies);
+            float roughness = 0.0f, brightness = 0.0f;
+            DriverAudioFFTProcessor_Process(&incomingAudio, bandEnergies, &roughness, &brightness);
+            for (int i = 0; i < AUDIO_BAND_COUNT; i++) latestAudioBandEnergies[i] = bandEnergies[i];
+            latestRoughness  = roughness;
+            latestBrightness = brightness;
             for (int i = 0; i < AUDIO_BAND_COUNT; i++) latestAudioBandEnergies[i] = bandEnergies[i];
         }
     }
@@ -106,3 +113,5 @@ void Scheduler_GetLatestBandEnergies(float *dest) {
 void Scheduler_GetLatestAudioBandEnergies(float *dest) {  
     for (int i = 0; i < AUDIO_BAND_COUNT; i++) dest[i] = latestAudioBandEnergies[i];
 }
+float Scheduler_GetLatestRoughness()  { return latestRoughness; }
+float Scheduler_GetLatestBrightness() { return latestBrightness; }

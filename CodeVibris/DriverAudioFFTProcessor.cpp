@@ -62,7 +62,8 @@ static float computeAudioBrightness(double *magnitude, float freqRes, int n) {
     return (energyTotal > 0.0f) ? energyHigh / energyTotal : 0.0f;
 }
 
-void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out) {
+void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out,
+                                      float *roughness_out, float *brightness_out) {
 
     double mean = 0;
     for (int i = 0; i < AUDIO_FFT_SAMPLES; i++) mean += input->samples[i];
@@ -87,5 +88,8 @@ void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out
     // Metric tambahan dari paper IEEE Access 2023 — untuk validasi dan presentasi
     float roughness  = computeAudioRoughness(input->samples, AUDIO_FFT_SAMPLES);
     float brightness = computeAudioBrightness(aReal, freqRes, AUDIO_FFT_SAMPLES);
+    
     Serial.printf("[AUDIO] Roughness=%.4f Brightness=%.4f\n", roughness, brightness);
+if (roughness_out)  *roughness_out  = roughness;
+if (brightness_out) *brightness_out = brightness;
 }
