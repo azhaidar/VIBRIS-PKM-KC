@@ -12,7 +12,7 @@
 
 static float g_snrCalibBuffer[200];
 static int   g_snrCalibCount = 0;
-static float g_runtimeSNRThreshold = 2.5f;  // fallback awal -- disesuaikan dari data SNR
+static float g_runtimeSNRThreshold = 0.2f;  // fallback awal -- disesuaikan dari data SNR
                                               // real motor uji (konsisten 2.1-4.9 di 2 sesi
                                               // logging terakhir), BUKAN tebakan. Nilai lama
                                               // (6.0) gak pernah kelewatan oleh SNR asli motor

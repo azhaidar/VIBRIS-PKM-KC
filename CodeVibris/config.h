@@ -48,7 +48,7 @@
 #define ARUS_ADC_OFFSET      2048    // Titik tengah ADC 12-bit (VCC / 2)
 #define ARUS_SAMPLE_COUNT    600     // Jumlah sampel untuk kalkulasi Root Mean Square
 #define ARUS_CAL_FACTOR      0.004397   // Koefisien pengali kalibrasi nilai ADC ke Ampere
-#define ARUS_NOISE_GATE      0.05f
+#define ARUS_NOISE_GATE      0.5f
 // Digital Signal Processing Configuration
 #define FFT_SAMPLES          256     // Jumlah sampel FFT getaran (Kunci lintas file)
 // Sistem Monitoring Configuration
