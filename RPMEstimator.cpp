@@ -12,7 +12,7 @@
 
 static float g_snrCalibBuffer[200];
 static int   g_snrCalibCount = 0;
-static float g_runtimeSNRThreshold = 2.5f;  // fallback awal -- disesuaikan dari data SNR
+static float g_runtimeSNRThreshold = 0.2f;  // fallback awal -- disesuaikan dari data SNR
                                               // real motor uji (konsisten 2.1-4.9 di 2 sesi
                                               // logging terakhir), BUKAN tebakan. Nilai lama
                                               // (6.0) gak pernah kelewatan oleh SNR asli motor
@@ -132,4 +132,21 @@ float RPM_ComputeBPFO(float fr_hz, int n_balls, float d_ball, float D_pitch, flo
 float RPM_ComputeBPFI(float fr_hz, int n_balls, float d_ball, float D_pitch, float phi_deg) {
     float phi_rad = phi_deg * (PI / 180.0f);
     return (n_balls / 2.0f) * fr_hz * (1.0f + (d_ball / D_pitch) * cos(phi_rad));
+}
+
+float RPM_ComputeBSF(float fr_hz, int n_balls, float d_ball,
+                     float D_pitch, float phi_deg) {
+    // Rumus dari gambar bearing yang kamu upload:
+    // BSF = (Pd/2Bd) * fr * [1 - (Bd/Pd * cos(phi))^2]
+    float phi_rad = phi_deg * (PI / 180.0f);
+    float ratio   = (d_ball / D_pitch) * cosf(phi_rad);
+    return (D_pitch / (2.0f * d_ball)) * fr_hz * (1.0f - ratio * ratio);
+}
+
+float RPM_ComputeFTF(float fr_hz, float d_ball,
+                     float D_pitch, float phi_deg) {
+    // Rumus dari gambar bearing yang kamu upload:
+    // FTF = (fr/2) * [1 - (Bd/Pd * cos(phi))]
+    float phi_rad = phi_deg * (PI / 180.0f);
+    return (fr_hz / 2.0f) * (1.0f - (d_ball / D_pitch) * cosf(phi_rad));
 }

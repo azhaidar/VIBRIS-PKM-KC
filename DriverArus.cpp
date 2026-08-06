@@ -108,6 +108,17 @@ void TaskDriverArus(void *pvParameters) {
             } else {
             delayMicroseconds(100); // 100µs → sample rate 10kHz
         }
+        uint32_t t0 = micros();          // <-- TAMBAH: catat waktu mulai, taruh SEBELUM loop for dimulai
+
+        for (int i = 0; i < ARUS_RMS_SAMPLE_COUNT; i++) {
+            // ... isi loop tetap sama, tidak diubah ...
+        }
+
+        uint32_t elapsedUs = micros() - t0;   // <-- TAMBAH
+        float actualHz = (float)ARUS_RMS_SAMPLE_COUNT * 1000000.0f / (float)elapsedUs;  // <-- TAMBAH
+        if (fabsf(actualHz - 10000.0f) > 200.0f) {  // toleransi 2%
+            Serial.printf("[WARNING][DriverArus] Target 10000Hz TIDAK tercapai! Aktual=%.1fHz\n", actualHz);
+        }
 
         float meanSquare      = (float)(sumSquared / ARUS_RMS_SAMPLE_COUNT);
         float rmsADC          = sqrtf(meanSquare);

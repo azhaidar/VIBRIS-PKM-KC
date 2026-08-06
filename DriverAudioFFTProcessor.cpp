@@ -33,14 +33,38 @@ static float audioBandEnergy(double *magnitude, float freqResolution,
     double energySum = 0;
     int binCount = 0;
     for (int i = binLow; i <= binHigh; i++) {
-        energySum += magnitude[i] * magnitude[i];
+        energySum += magnitude[i];
         binCount++;
     }
     if (binCount == 0) return 0.0f;
     return (float)(energySum / binCount);
 }
+// Roughness — Ota & Unoki, IEEE Access 2023, persamaan (14)
+// Mengukur fluktuasi amplitudo antar-sampel. Naik saat bearing rusak.
+static float computeAudioRoughness(float *samples, int n) {
+    if (n < 2) return 0.0f;
+    float sumDiff = 0.0f;
+    for (int i = 1; i < n; i++) {
+        sumDiff += fabsf(samples[i] - samples[i-1]);
+    }
+    return sumDiff / (float)(n - 1);
+}
 
-void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out) {
+// Brightness — Ota & Unoki, IEEE Access 2023, persamaan (8-9)
+// Rasio energi >2kHz terhadap total. Naik saat ada gesekan/decitan.
+static float computeAudioBrightness(double *magnitude, float freqRes, int n) {
+    float energyHigh = 0.0f, energyTotal = 0.0f;
+    for (int k = 0; k < n / 2; k++) {
+        float freq = k * freqRes;
+        energyTotal += (float)(magnitude[k]);
+        if (freq >= 2000.0f) energyHigh += (float)(magnitude[k]);
+    }
+    return (energyTotal > 0.0f) ? energyHigh / energyTotal : 0.0f;
+}
+
+void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out,
+                                      float *roughness_out, float *brightness_out) {
+
     double mean = 0;
     for (int i = 0; i < AUDIO_FFT_SAMPLES; i++) mean += input->samples[i];
     mean /= AUDIO_FFT_SAMPLES;
@@ -53,13 +77,19 @@ void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out
     audioFFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
     audioFFT.compute(FFTDirection::Forward);
     audioFFT.complexToMagnitude();
-    for (int i = 0; i < AUDIO_FFT_SAMPLES / 2; i++) {
-    aReal[i] = aReal[i] / (double)AUDIO_FFT_SAMPLES;
-}
+
 
     float freqRes = (float)AUDIO_SAMPLE_RATE / AUDIO_FFT_SAMPLES;
 
     bandEnergies_out[0] = audioBandEnergy(aReal, freqRes, AUDIO_BAND_LOW_MIN_HZ,  AUDIO_BAND_LOW_MAX_HZ,  AUDIO_FFT_SAMPLES);
     bandEnergies_out[1] = audioBandEnergy(aReal, freqRes, AUDIO_BAND_MID_MIN_HZ,  AUDIO_BAND_MID_MAX_HZ,  AUDIO_FFT_SAMPLES);
     bandEnergies_out[2] = audioBandEnergy(aReal, freqRes, AUDIO_BAND_HIGH_MIN_HZ, AUDIO_BAND_HIGH_MAX_HZ, AUDIO_FFT_SAMPLES);
+
+    // Metric tambahan dari paper IEEE Access 2023 — untuk validasi dan presentasi
+    float roughness  = computeAudioRoughness(input->samples, AUDIO_FFT_SAMPLES);
+    float brightness = computeAudioBrightness(aReal, freqRes, AUDIO_FFT_SAMPLES);
+    
+    Serial.printf("[AUDIO] Roughness=%.4f Brightness=%.4f\n", roughness, brightness);
+if (roughness_out)  *roughness_out  = roughness;
+if (brightness_out) *brightness_out = brightness;
 }

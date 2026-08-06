@@ -43,17 +43,17 @@
 #define SUHU_MAX_DELTA       1.5000  // Ambang batas Slew Rate Limiter suhu
 #define SUHU_DEFAULT_VALID   27.0    // Nilai fallback jika sensor error
 // Sensor Arus (SCT) Configuration
-//330 burden, 10uF kapasitor, 10k 2x resisrot
+//burden internakl, 10uF kapasitor, 10k 2x resisrot
 #define TICK_DELAY_ARUS      100     // Jeda eksekusi antar perhitungan RMS (ms)
 #define ARUS_ADC_OFFSET      2048    // Titik tengah ADC 12-bit (VCC / 2)
 #define ARUS_SAMPLE_COUNT    600     // Jumlah sampel untuk kalkulasi Root Mean Square
 #define ARUS_CAL_FACTOR      0.004397   // Koefisien pengali kalibrasi nilai ADC ke Ampere
-#define ARUS_NOISE_GATE      0.05f
+#define ARUS_NOISE_GATE      0.5f
 // Digital Signal Processing Configuration
 #define FFT_SAMPLES          256     // Jumlah sampel FFT getaran (Kunci lintas file)
 // Sistem Monitoring Configuration
 #define TICK_DELAY_REPORT    100   // Interval Serial Print pelaporan data (ms)
-#define VIBRATION_SAMPLE_RATE_HZ 380U
+#define VIBRATION_SAMPLE_RATE_HZ 400U
 #define VIBRATION_SAMPLE_PERIOD_US \
     (1000000UL / VIBRATION_SAMPLE_RATE_HZ)
 
