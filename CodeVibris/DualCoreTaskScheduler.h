@@ -39,3 +39,6 @@ float Scheduler_GetLatestSNR();
 void Scheduler_GetLatestBandEnergies(float *dest);   // TAMBAHAN
 void Scheduler_GetLatestAudioBandEnergies(float *dest);
 void Scheduler_GetLatestAxisRMS(float *xOut, float *yOut, float *zOut);
+// TAMBAH DUA BARIS INI:
+float Scheduler_GetLatestRoughness();
+float Scheduler_GetLatestBrightness();

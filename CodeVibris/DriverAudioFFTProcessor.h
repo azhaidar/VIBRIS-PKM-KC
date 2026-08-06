@@ -39,10 +39,10 @@ WAJIB validasi empiris (rekam motor normal vs motor dengan kerusakan
 diketahui, bandingkan spektrumnya) sebelum diklaim sebagai kemampuan
 diagnostik nyata ke juri PIMNAS.
 */
-
 void DriverAudioFFTProcessor_Init();
 
 // Proses satu buffer audio mentah (AUDIO_FFT_SAMPLES sample) jadi
 // AUDIO_BAND_COUNT nilai energi band. bandEnergies_out harus punya
 // kapasitas minimal AUDIO_BAND_COUNT float.
-void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out);
+void DriverAudioFFTProcessor_Process(AudioBuffer *input, float *bandEnergies_out,
+                                      float *roughness_out, float *brightness_out);
