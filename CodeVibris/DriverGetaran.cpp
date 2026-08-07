@@ -13,7 +13,7 @@ static Adafruit_LIS3DH lis3dhInstance = Adafruit_LIS3DH(&I2CLis3dh);
 void TaskDriverGetaran(void *pvParameters) {
     (void)pvParameters;
 
-    I2CLis3dh.begin(PIN_LIS3DH_SDA, PIN_LIS3DH_SCL, 100000);
+    I2CLis3dh.begin(PIN_LIS3DH_SDA, PIN_LIS3DH_SCL, 400000);
 
     if (!lis3dhInstance.begin(0x18)) {
         for (;;) {

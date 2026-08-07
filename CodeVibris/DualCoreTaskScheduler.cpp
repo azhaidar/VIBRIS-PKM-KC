@@ -82,8 +82,7 @@ static void TaskAudioFFTProcessor(void *pvParameters) {
             for (int i = 0; i < AUDIO_BAND_COUNT; i++) latestAudioBandEnergies[i] = bandEnergies[i];
             latestRoughness  = roughness;
             latestBrightness = brightness;
-            for (int i = 0; i < AUDIO_BAND_COUNT; i++) latestAudioBandEnergies[i] = bandEnergies[i];
-        }
+            }
     }
 }
 void Scheduler_InitTasks() {
