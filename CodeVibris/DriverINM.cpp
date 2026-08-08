@@ -13,10 +13,10 @@
 void TaskDriverINM(void *pvParameters) {
     // Casting pointer parameter ke objek memori bersama
     (void)pvParameters;
-    
+     
     // Konfigurasi internal periferal hardware I2S ESP32-S3
     i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX), // Master mode, hanya menerima data
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),// Master mode, hanya menerima data
         .sample_rate = 16000,                               // Frekuensi sampling audio 16 kHz
         .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,       // INMP441 mengirimkan data dalam slot 32-bit
         .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,        // Mengambil data dari saluran tunggal (Mono)
@@ -65,7 +65,7 @@ void TaskDriverINM(void *pvParameters) {
                 valid_sample_count++;
 
                 if (i < AUDIO_FFT_SAMPLES) {
-                    localAudioBuffer.samples[i] = (float)cleanSample;  
+                    localAudioBuffer.samples[i] = (float)cleanSample/8388608.0f;  
                 }
             }
             

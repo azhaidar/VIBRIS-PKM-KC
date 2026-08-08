@@ -28,13 +28,6 @@ float DriverArus_GetLastRawADC() {
     return g_lastRawADC; 
 }
 
-
-// Jumlah sample harus kelipatan bulat SATU SIKLUS AC penuh.
-// Di 50Hz dengan sampling interval 100µs (10kHz):
-//   1 siklus = 10000/50 = 200 sample
-//   3 siklus = 600 sample (dipilih: margin lebih lebar, noise statistik lebih kecil)
-// JANGAN pakai angka non-kelipatan (misal 500) → RMS berfluktuasi karena
-// setengah siklus "menggantung" di akhir window.
 #define ARUS_RMS_SAMPLE_COUNT   600   // override ARUS_SAMPLE_COUNT di config.h khusus file ini
 #include "MultiSensorFeatureMerger.h"
 // Jumlah sample untuk fase warm-up HPF (filter harus converge ke baseline
@@ -44,15 +37,8 @@ float DriverArus_GetLastRawADC() {
 void TaskDriverArus(void *pvParameters) {
     (void)pvParameters;
 
-    // FIX 1: Set attenuation 11dB SEBELUM analogRead pertama.
-    // Tanpa ini ESP32-S3 default 0dB → hanya baca 0–0.75V → ADC selalu clipping
-    // karena sinyal SCT yang di-bias ke 1.65V tidak terbaca sama sekali.
     analogReadResolution(12);
     analogSetPinAttenuation(PIN_SCT_ADC, ADC_11db); // range penuh 0–3.3V
-
-    // FIX 2: Inisialisasi filter state dengan nilai ADC mid-point NYATA,
-    // bukan asumsi 2048. Baca dulu beberapa sample untuk dapat estimasi DC.
-    // Ini mencegah spike transient besar di iterasi pertama HPF.
     float dcEstimate = 0.0f;
     for (int i = 0; i < 32; i++) {
         dcEstimate += (float)analogRead(PIN_SCT_ADC);
@@ -60,20 +46,8 @@ void TaskDriverArus(void *pvParameters) {
     }
     dcEstimate /= 32.0f;
 
-    //GANTI TOTAL dari filter selisih-lalu-integrasi (rentan ngamplifikasi
-    // drift lambat sampai ~249x, lihat analisis data motor-mati 24 Jul) jadi
-    // "pelacak titik-nol" yang jalan terus-menerus: tiap sample, dcBaseline
-    // digeser SEDIKIT ke arah rawSample terkini. Sangat lambat (beta kecil)
-    // supaya dia BUTA terhadap sinyal AC 50Hz (1 siklus cuma 20ms, jauh lebih
-    // cepat dari kecepatan tracking-nya), tapi tetap ngikutin drift termal
-    // yang berlangsung dalam hitungan menit.
     float dcBaseline = dcEstimate; // mulai dari estimasi 32-sample awal, sama seperti sebelumnya
     const float dcTrackBeta = 3.2e-5f; // cutoff ~0.05Hz (time constant ~20 detik)
-
-    // FIX 3: Warm-up phase — jalankan HPF dulu tanpa akumulasi RMS
-    // sampai filter converge ke baseline yang benar.
-    // Tanpa ini, spike awal akibat initial condition akan masuk ke sumSquared
-    // dan menghasilkan RMS palsu yang terlalu tinggi di window pertama.
     for (int i = 0; i < ARUS_WARMUP_SAMPLES; i++) {
         float rawSample = (float)analogRead(PIN_SCT_ADC);
         dcBaseline += dcTrackBeta * (rawSample - dcBaseline);
@@ -81,39 +55,7 @@ void TaskDriverArus(void *pvParameters) {
     }
 
     for (;;) {
-        // FIX 4: Gunakan 600 sample (3 siklus penuh @50Hz pada 10kHz sampling).
-        // Sebelumnya 500 sample = 2.5 siklus → RMS berfluktuasi ±beberapa persen
-        // tergantung fase awal sampling, bukan karena noise nyata.
         double sumSquared = 0.0;
-
-        for (int i = 0; i < ARUS_RMS_SAMPLE_COUNT; i++) {
-           float rawSample = (float)analogRead(PIN_SCT_ADC);
-
-            // Update titik-nol SEDIKIT tiap sample (lacak drift real-time),
-            // lalu buang dari raw sample -- sisanya murni komponen AC.
-            dcBaseline += dcTrackBeta * (rawSample - dcBaseline);
-            float acSample = rawSample - dcBaseline;
-
-            sumSquared += (double)(acSample * acSample);
-
-        // FIX: delayMicroseconds() busy-wait murni -- Core 1 diblokir total
-        // tanpa context-switch. TaskDriverArus (prioritas 2) berbagi Core 1
-        // dengan loop() Arduino (prioritas default lebih rendah), jadi 600
-        // sample x 100us = 60ms blokir PENUH tiap siklus 100ms bikin loop()
-        // nyaris tidak kebagian CPU. Data lapangan: 1-4 baris/detik, bukan
-        // 10/detik yang diasumsikan TICK_DELAY_REPORT=100ms. Yield 1 tick
-        // tiap 100 sample kasih celah scheduler menjalankan loop() & task lain.
-            if (i % 100 == 99) {
-                vTaskDelay(1);
-            } else {
-            delayMicroseconds(100); // 100µs → sample rate 10kHz
-        }
-        uint32_t t0 = micros();          // <-- TAMBAH: catat waktu mulai, taruh SEBELUM loop for dimulai
-
-        for (int i = 0; i < ARUS_RMS_SAMPLE_COUNT; i++) {
-            // ... isi loop tetap sama, tidak diubah ...
-        }
-
         uint32_t elapsedUs = micros() - t0;   // <-- TAMBAH
         float actualHz = (float)ARUS_RMS_SAMPLE_COUNT * 1000000.0f / (float)elapsedUs;  // <-- TAMBAH
         if (fabsf(actualHz - 10000.0f) > 200.0f) {  // toleransi 2%
@@ -124,10 +66,6 @@ void TaskDriverArus(void *pvParameters) {
         float rmsADC          = sqrtf(meanSquare);
         g_lastRawADC          = rmsADC;
         Serial.printf("[ARUS-DIAG] dcBaseline=%.2f rmsADC=%.4f\n", dcBaseline, rmsADC);
-        // FIX 5: Dokumentasi derivasi konversi
-        // rmsADC adalah nilai RMS dalam satuan ADC count (bukan Volt, bukan Ampere).
-        // ARUS_CAL_FACTOR mengkonversi langsung ke Ampere.
-        // PERBARUI nilai ini berdasarkan kalibrasi empiris (lihat catatan di atas).
         float calculatedCurrent = rmsADC * ARUS_CAL_FACTOR;
 
         if (calculatedCurrent < ARUS_NOISE_GATE) {
@@ -137,6 +75,5 @@ void TaskDriverArus(void *pvParameters) {
         updateCurrentFeature(calculatedCurrent);
 
         vTaskDelay(pdMS_TO_TICKS(TICK_DELAY_ARUS));
-        }
     }
 }

@@ -129,12 +129,7 @@ DetectionResult runDetectionCycle() {
     }
 
     float d2 = computeMahalanobisQuadraticForm(currentFeaturesStd, zeroMean, sigmaInverse);
-    const unsigned long GRACE_PERIOD_MS = 120000;
-    float thresholdMultiplier = 1.0f;
-    if (millis() - baselineReadyTimestamp < GRACE_PERIOD_MS) {
-        thresholdMultiplier = 1.5f;
-    }
-    const char* label = classifyStatusFromD2(d2 / thresholdMultiplier);
+    const char* label = classifyStatusFromD2(d2);
     bool isNormal = (strcmp(label, "Normal") == 0);
 
     // GANTI: currentFeaturesStd -> currentFeatures (RAW) -- sesuai kontrak
